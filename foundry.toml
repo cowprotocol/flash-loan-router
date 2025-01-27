@@ -3,4 +3,14 @@ src = "src"
 out = "out"
 libs = ["lib"]
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# Compiler settings
+solc = "0.8.28"
+optimizer = true
+optimizer_runs = 1000000
+
+[fmt]
+sort_imports = true
+
+[profile.ci]
+deny_warnings = true
+fuzz.seed = '0'
