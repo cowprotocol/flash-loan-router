@@ -25,10 +25,19 @@ abstract contract TransientStorageArray {
 
     /// @notice The number of bytes currently stored in the transient storage
     /// array.
-    uint256 internal transient transientStorageLength;
+    uint256 private transient length;
+
+    /// @notice Read the length of the transient storage array.
+    /// @return The length of the data stored in the transient storage array in
+    /// bytes.
+    /// @dev We don't want to give direct access to `length` as the code assumes
+    /// that this value cannot be large enough to cause overflows.
+    function transientStorageArrayLength() internal view returns (uint256) {
+        return length;
+    }
 
     function storeToTransientStorageArray(bytes calldata data) internal {
-        transientStorageLength = data.length;
+        length = data.length;
         uint256 storedBytes = 0;
         while (storedBytes < data.length) {
             // Each (transient) storage slot stores a full word.
@@ -62,14 +71,14 @@ abstract contract TransientStorageArray {
     }
 
     function readTransientStorageArray() internal view returns (bytes memory data) {
-        uint256 byteLength = transientStorageLength;
-        // The number of words to read is `ceil(byteLength / BYTES_IN_WORD)`.
-        // `byteLength` could be controlled by the user, so we check for
-        // addition overflows. All other operations are known not to cause
-        // over/underflows.
-        uint256 wordsToRead = byteLength + BYTES_IN_WORD;
+        uint256 byteLength = length;
+        uint256 wordsToRead;
         unchecked {
-            wordsToRead = (wordsToRead - 1) / BYTES_IN_WORD;
+            // The number of words to read is `ceil(byteLength / BYTES_IN_WORD)`
+            // and the only way to set `byteLength` is by storing data on the
+            // storage array. Because of the block gas limit, this number cannot
+            // be large enough to cause overflows.
+            wordsToRead = (byteLength + BYTES_IN_WORD - 1) / BYTES_IN_WORD;
             data = new bytes(BYTES_IN_WORD * wordsToRead);
         }
         uint256 dataMemoryLocation;

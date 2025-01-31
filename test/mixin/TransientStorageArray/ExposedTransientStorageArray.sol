@@ -14,6 +14,10 @@ contract ExposedTransientStorageArray is TransientStorageArray {
     function read() external view returns (bytes memory) {
         return readTransientStorageArray();
     }
+
+    function length() external view returns (uint256) {
+        return transientStorageArrayLength();
+    }
 }
 
 uint256 constant BYTES_IN_WORD = 32;
@@ -44,6 +48,23 @@ contract StoreAndRead {
         tsa.store(first);
         tsa.store(second);
         return tsa.read();
+    }
+
+    function checkLength(Vm vm, bytes memory data) external {
+        vm.assertEq(tsa.length(), 0);
+        tsa.store(data);
+        vm.assertEq(tsa.length(), data.length);
+        tsa.read();
+        // Reading doesn't clear the array.
+        vm.assertEq(tsa.length(), data.length);
+    }
+
+    function checkOverriddenLength(Vm vm, bytes memory data1, bytes memory data2) external {
+        vm.assertEq(tsa.length(), 0);
+        tsa.store(data1);
+        vm.assertEq(tsa.length(), data1.length);
+        tsa.store(data2);
+        vm.assertEq(tsa.length(), data2.length);
     }
 
     function checkRoundtripDirtyCalldata(Vm vm) external {

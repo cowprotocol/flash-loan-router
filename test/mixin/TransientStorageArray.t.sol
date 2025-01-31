@@ -64,6 +64,17 @@ contract TransientStorageArrayTest is Test {
         checkRoundTrip(sequentialByteArrayOfSize(80000 * BYTES_IN_WORD + 1));
     }
 
+    function test_keepsTrackOfLenght() external {
+        executor.checkLength(vm, sequentialByteArrayOfSize(BYTES_IN_WORD * 42));
+    }
+
+    function test_lengthChangesWhenOverriding() external {
+        bytes memory short = sequentialByteArrayOfSize(4242);
+        bytes memory long = sequentialByteArrayOfSize(31337);
+        executor.checkOverriddenLength(vm, short, long);
+        executor.checkOverriddenLength(vm, long, short);
+    }
+
     function test_ignoresSpuriousCalldata() external {
         executor.checkRoundtripDirtyCalldata(vm);
     }
