@@ -8,6 +8,15 @@ solc = "0.8.28"
 optimizer = true
 optimizer_runs = 1000000
 
+# Test settings
+# The following flag is used to give better control of the transient storage
+# state between transactions in tests. With this flag enabled, each call in a
+# test function is executed as an independent transaction (normally, a test
+# would be a single transaction). This means that transient storage is cleared
+# after every call in a test function. See also:
+# https://github.com/foundry-rs/foundry/issues/6908
+isolate = true
+
 [fmt]
 sort_imports = true
 
