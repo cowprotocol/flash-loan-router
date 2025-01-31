@@ -36,6 +36,8 @@ abstract contract TransientStorageArray {
         return length;
     }
 
+    /// @notice The input bytes array is copied to transient storage.
+    /// @param data The bytes array to copy to the transient storage array.
     function storeToTransientStorageArray(bytes calldata data) internal {
         length = data.length;
         uint256 storedBytes = 0;
@@ -70,6 +72,10 @@ abstract contract TransientStorageArray {
         }
     }
 
+    /// @notice A memory array is allocated with the current content of the
+    /// transient storage array.
+    /// @return data A memory array with the data contained in the transient
+    /// storage array.
     function readTransientStorageArray() internal view returns (bytes memory data) {
         uint256 byteLength = length;
         uint256 wordsToRead;
