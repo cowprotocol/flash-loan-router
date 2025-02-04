@@ -123,4 +123,13 @@ abstract contract TransientStorageArray {
             mstore(dataMemoryLocation, byteLength)
         }
     }
+
+    /// @notice Clear all the content of the transient storage array, leaving
+    /// in its stead an empty array
+    /// @dev The actual transient storage array content isn't actually reset to
+    /// zero bytes, however this data cannot be accessed and can be overwritten
+    /// at a later point
+    function clearTransientStorageArray() internal {
+        length = 0;
+    }
 }
