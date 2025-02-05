@@ -12,3 +12,8 @@ docs/
 
 # Dotenv file
 .env
+
+
+# Build artifacts to keep
+/artifacts/*
+!/artifacts/ERC3156FlashLoanSolverWrapper.sol
