@@ -18,6 +18,10 @@ contract ExposedTransientStorageArray is TransientStorageArray {
     function length() external view returns (uint256) {
         return transientStorageArrayLength();
     }
+
+    function clear() external {
+        clearTransientStorageArray();
+    }
 }
 
 uint256 constant BYTES_IN_WORD = 32;
@@ -47,6 +51,25 @@ contract StoreAndRead {
     function storeTwiceAndRead(bytes memory first, bytes memory second) external returns (bytes memory) {
         tsa.store(first);
         tsa.store(second);
+        return tsa.read();
+    }
+
+    function storeClearReturnLength(bytes memory data) external returns (uint256) {
+        tsa.store(data);
+        tsa.clear();
+        return tsa.length();
+    }
+
+    function storeClearAndRead(bytes memory data) external returns (bytes memory) {
+        tsa.store(data);
+        tsa.clear();
+        return tsa.read();
+    }
+
+    function storeClearStoreAndRead(bytes memory data1, bytes memory data2) external returns (bytes memory) {
+        tsa.store(data1);
+        tsa.clear();
+        tsa.store(data2);
         return tsa.read();
     }
 
