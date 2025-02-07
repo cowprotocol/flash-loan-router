@@ -23,7 +23,7 @@ contract E2eMaker is Test {
     using ForkedRpc for Vm;
 
     uint256 private constant MAINNET_FORK_BLOCK = 21765553;
-    // https://docs-v2.balancer.fi/reference/contracts/flash-loans.html
+    // https://docs.makerdao.com/smart-contract-modules/flash-mint-module
     IERC3156FlashLender private constant MAKER_FLASH_LOAN_CONTRACT =
         IERC3156FlashLender(0x60744434d6339a6B27d73d9Eda62b6F66a0a04FA);
     address private solver = makeAddr("E2eBalancerV2: solver");
