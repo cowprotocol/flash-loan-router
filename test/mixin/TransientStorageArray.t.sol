@@ -83,8 +83,20 @@ contract TransientStorageArrayTest is Test {
         checkRoundTrip(data);
     }
 
-    function testFuzz_canOverrideArray(bytes memory firstArray, bytes memory secondArray) private {
+    function testFuzz_canOverrideArray(bytes memory firstArray, bytes memory secondArray) external {
         assertEq(executor.storeTwiceAndRead(firstArray, secondArray), secondArray);
+    }
+
+    function testFuzz_clearingDoesNotAffectFutureStore(bytes memory data) external {
+        assertEq(executor.storeClearAndRead(data), hex"");
+    }
+
+    function testFuzz_clearedArrayHasZeroLength(bytes memory data) external {
+        assertEq(executor.storeClearReturnLength(data), 0);
+    }
+
+    function testFuzz_clearingDoesNotAffectFutureStore(bytes memory firstArray, bytes memory secondArray) external {
+        assertEq(executor.storeClearStoreAndRead(firstArray, secondArray), secondArray);
     }
 
     function testFuzz_settingTransientVariablesDoesNotChangeArray(bytes memory data) external {
