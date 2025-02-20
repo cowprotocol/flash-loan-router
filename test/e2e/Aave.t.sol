@@ -3,12 +3,7 @@ pragma solidity ^0.8;
 
 import {Test, Vm} from "forge-std/Test.sol";
 
-import {
-    ERC3156FlashLoanSolverWrapper,
-    ICowSettlement,
-    IERC20,
-    IERC3156FlashLender
-} from "src/ERC3156FlashLoanSolverWrapper.sol";
+import {AaveFlashLoanSolverWrapper, IAavePool, ICowSettlement, IERC20} from "src/AaveFlashLoanSolverWrapper.sol";
 import {IFlashLoanSolverWrapper} from "src/interface/IFlashLoanSolverWrapper.sol";
 
 import {Constants} from "./lib/Constants.sol";
@@ -20,16 +15,22 @@ import {TokenBalanceAccumulator} from "./lib/TokenBalanceAccumulator.sol";
 /// @dev Documentation for the ERC-3156-compatible flash loans by Maker can be
 /// found at:
 /// <https://docs.makerdao.com/smart-contract-modules/flash-mint-module>
-contract E2eMaker is Test {
+contract E2eAave is Test {
     using ForkedRpc for Vm;
 
-    uint256 private constant MAINNET_FORK_BLOCK = 21765553;
-    // https://docs.makerdao.com/smart-contract-modules/flash-mint-module
-    IERC3156FlashLender private constant MAKER_FLASH_LOAN_CONTRACT =
-        IERC3156FlashLender(0x60744434d6339a6B27d73d9Eda62b6F66a0a04FA);
-    address private solver = makeAddr("E2eBalancerV2: solver");
+    // This is the block immediately before a mainnet fee withdrawal:
+    // <https://etherscan.io/tx/0x2ac75cbf67d74ae3ad736314acb9dba170922849d411cc7ccbe81e4e0cff157e>
+    // It guarantees that there are some WETH available in the buffers to pay
+    // for the flash loan.
+    uint256 private constant MAINNET_FORK_BLOCK = 21883877;
+    // The pool address is retrieved from the Aave aToken address corresponding
+    // to the desired collateral through the POOL() function. The token address
+    // can retrieved from the web interface:
+    // https://app.aave.com/reserve-overview/?underlyingAsset=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&marketName=proto_mainnet_v3
+    IAavePool private constant AAVE_WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+    address private solver = makeAddr("E2eAaveV2: solver");
 
-    ERC3156FlashLoanSolverWrapper private solverWrapper;
+    AaveFlashLoanSolverWrapper private solverWrapper;
     TokenBalanceAccumulator private tokenBalanceAccumulator;
 
     function setUp() external {
@@ -40,34 +41,39 @@ contract E2eMaker is Test {
     }
 
     function prepareSolverWrapper() private {
-        solverWrapper = new ERC3156FlashLoanSolverWrapper(Constants.SETTLEMENT_CONTRACT);
+        solverWrapper = new AaveFlashLoanSolverWrapper(Constants.SETTLEMENT_CONTRACT);
 
         // The solver wrapper must be a solver because it directly calls
         // `settle`.
         CowProtocol.addSolver(vm, address(solverWrapper));
 
-        // Call `approve` from the settlement contract so that DAI can be spent
+        // Call `approve` from the settlement contract so that WETH can be spent
         // on a settlement interaction on behalf of the solver wrapper. With an
         // unlimited approval, this step only needs to be performed once per
         // loaned token.
         ICowSettlement.Interaction[] memory onlyApprove = new ICowSettlement.Interaction[](1);
         onlyApprove[0] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.DAI, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
+            solverWrapper, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
         );
         vm.prank(solver);
         CowProtocol.emptySettleWithInteractions(onlyApprove);
     }
 
     function test_settleWithFlashLoan() external {
-        uint256 loanedAmount = 10_000 ether; // $10,000
+        uint256 loanedAmount = 500 ether; // 500 WETH
 
-        uint256 flashFee = MAKER_FLASH_LOAN_CONTRACT.flashFee(address(Constants.DAI), loanedAmount);
-        // Flash loan fees are always zero in the Maker contract. We just need
-        // to repay the borrowed collateral at the end.
-        // <https://etherscan.io/address/0x07df2ad9878F8797B4055230bbAE5C808b8259b3#code#F1#L31>
-        assertEq(flashFee, 0);
+        // Note: one unit of flash fee represents 0.1% of the borrowed amount.
+        // See:
+        // <https://github.com/aave-dao/aave-v3-origin/blob/v3.1.0/src/core/contracts/protocol/libraries/math/PercentageMath.sol>
+        uint256 relativeFlashFee = AAVE_WETH_POOL.FLASHLOAN_PREMIUM_TOTAL();
+        assertGt(relativeFlashFee, 0);
+        uint256 absoluteFlashFee = loanedAmount * relativeFlashFee / 1000;
 
-        uint256 settlementInitialDaiBalance = Constants.DAI.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
+        uint256 settlementInitialWethBalance = Constants.WETH.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
+        // We cover the balance of the flash fee with the tokens that are
+        // currently present in the settlement contract.
+        assertGt(settlementInitialWethBalance, absoluteFlashFee);
+
         TokenBalanceAccumulator.Balance[] memory expectedBalances = new TokenBalanceAccumulator.Balance[](3);
 
         // Start preparing the settlement interactions.
@@ -75,15 +81,15 @@ contract E2eMaker is Test {
         // First, we confirm that, at the point in time of the settlement, the
         // flash loan proceeds are indeed stored in the wrapper solver.
         interactionsWithFlashLoan[0] = CowProtocolInteraction.pushBalanceToAccumulator(
-            tokenBalanceAccumulator, Constants.DAI, address(solverWrapper)
+            tokenBalanceAccumulator, Constants.WETH, address(solverWrapper)
         );
-        expectedBalances[0] = TokenBalanceAccumulator.Balance(Constants.DAI, address(solverWrapper), loanedAmount);
+        expectedBalances[0] = TokenBalanceAccumulator.Balance(Constants.WETH, address(solverWrapper), loanedAmount);
         // Second, we double check that the settlement balance hasn't changed.
         interactionsWithFlashLoan[1] = CowProtocolInteraction.pushBalanceToAccumulator(
-            tokenBalanceAccumulator, Constants.DAI, address(Constants.SETTLEMENT_CONTRACT)
+            tokenBalanceAccumulator, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT)
         );
         expectedBalances[1] = TokenBalanceAccumulator.Balance(
-            Constants.DAI, address(Constants.SETTLEMENT_CONTRACT), settlementInitialDaiBalance
+            Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), settlementInitialWethBalance
         );
         // Third, we make sure we can transfer these tokens. We do that by
         // trying a transfer into the settlement contract. The expectation is
@@ -92,35 +98,38 @@ contract E2eMaker is Test {
         // transfer is expected to be the user rather than the settlement
         // contract for gas efficiency.
         interactionsWithFlashLoan[2] = CowProtocolInteraction.transferFrom(
-            Constants.DAI, address(solverWrapper), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
+            Constants.WETH, address(solverWrapper), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
         );
         // Fourth, we check that the balance has indeed changed.
         interactionsWithFlashLoan[3] = CowProtocolInteraction.pushBalanceToAccumulator(
-            tokenBalanceAccumulator, Constants.DAI, address(Constants.SETTLEMENT_CONTRACT)
+            tokenBalanceAccumulator, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT)
         );
         expectedBalances[2] = TokenBalanceAccumulator.Balance(
-            Constants.DAI, address(Constants.SETTLEMENT_CONTRACT), settlementInitialDaiBalance + loanedAmount
+            Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), settlementInitialWethBalance + loanedAmount
         );
-        // Fifth, prepare the flash-loan repayment. Maker makes you repay the
+        // Fifth, prepare the flash-loan repayment. Aave makes you repay the
         // loan by calling `transferFrom` under the assumption that the flash
-        // loan borrower holds the funds and has approved its contract for
-        // withdrawing funds.
+        // loan borrower holds the funds plus the expected fee and has approved
+        // its contract for withdrawing this amount.
         interactionsWithFlashLoan[4] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.DAI, address(MAKER_FLASH_LOAN_CONTRACT), loanedAmount
+            solverWrapper, Constants.WETH, address(AAVE_WETH_POOL), loanedAmount + absoluteFlashFee
         );
         // Sixth and finally, send the funds to the solver wrapper for repayment
         // of the loan.
         interactionsWithFlashLoan[5] =
-            CowProtocolInteraction.transfer(Constants.DAI, address(solverWrapper), loanedAmount);
+            CowProtocolInteraction.transfer(Constants.WETH, address(solverWrapper), loanedAmount + absoluteFlashFee);
 
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
         vm.prank(solver);
         IFlashLoanSolverWrapper.LoanRequest memory loanRequest =
-            IFlashLoanSolverWrapper.LoanRequest(Constants.DAI, loanedAmount);
-        solverWrapper.flashLoanAndSettle(address(MAKER_FLASH_LOAN_CONTRACT), loanRequest, settleCallData);
+            IFlashLoanSolverWrapper.LoanRequest(Constants.WETH, loanedAmount);
+        solverWrapper.flashLoanAndSettle(address(AAVE_WETH_POOL), loanRequest, settleCallData);
 
         tokenBalanceAccumulator.assertAccumulatorEq(vm, expectedBalances);
-        assertEq(Constants.DAI.balanceOf(address(Constants.SETTLEMENT_CONTRACT)), settlementInitialDaiBalance);
+        assertEq(
+            Constants.WETH.balanceOf(address(Constants.SETTLEMENT_CONTRACT)),
+            settlementInitialWethBalance - absoluteFlashFee
+        );
     }
 }
