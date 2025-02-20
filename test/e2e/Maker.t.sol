@@ -9,9 +9,9 @@ import {
     IERC20,
     IERC3156FlashLender
 } from "src/ERC3156FlashLoanSolverWrapper.sol";
+import {IFlashLoanSolverWrapper} from "src/interface/IFlashLoanSolverWrapper.sol";
 
 import {Constants} from "./lib/Constants.sol";
-
 import {CowProtocol} from "./lib/CowProtocol.sol";
 import {ForkedRpc} from "./lib/ForkedRpc.sol";
 import {TokenBalanceAccumulator} from "./lib/TokenBalanceAccumulator.sol";
@@ -103,9 +103,9 @@ contract E2eMaker is Test {
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
         vm.prank(solver);
-        ERC3156FlashLoanSolverWrapper.LoanRequest memory loanRequest =
-            ERC3156FlashLoanSolverWrapper.LoanRequest(Constants.DAI, loanedAmount);
-        solverWrapper.flashLoanAndSettle(MAKER_FLASH_LOAN_CONTRACT, loanRequest, settleCallData);
+        IFlashLoanSolverWrapper.LoanRequest memory loanRequest =
+            IFlashLoanSolverWrapper.LoanRequest(Constants.DAI, loanedAmount);
+        solverWrapper.flashLoanAndSettle(address(MAKER_FLASH_LOAN_CONTRACT), loanRequest, settleCallData);
 
         tokenBalanceAccumulator.assertAccumulatorEq(vm, expectedBalances);
         assertEq(Constants.DAI.balanceOf(address(Constants.SETTLEMENT_CONTRACT)), settlementInitialDaiBalance);
@@ -155,7 +155,7 @@ contract E2eMaker is Test {
         return ICowSettlement.Interaction({
             target: address(solverWrapper),
             value: 0,
-            callData: abi.encodeCall(ERC3156FlashLoanSolverWrapper.approve, (Constants.DAI, spender, amount))
+            callData: abi.encodeCall(IFlashLoanSolverWrapper.approve, (Constants.DAI, spender, amount))
         });
     }
 }
