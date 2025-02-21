@@ -3,7 +3,7 @@ pragma solidity ^0.8;
 
 import {Vm} from "forge-std/Test.sol";
 
-import {FlashLoanSolverWrapper, ICowSettlement, IERC20} from "src/mixin/FlashLoanSolverWrapper.sol";
+import {ICowSettlement, IERC20, IFlashLoanSolverWrapper} from "src/interface/IFlashLoanSolverWrapper.sol";
 
 import {TokenBalanceAccumulator} from "./TokenBalanceAccumulator.sol";
 
@@ -32,7 +32,7 @@ library CowProtocolInteraction {
         });
     }
 
-    function wrapperApprove(FlashLoanSolverWrapper solverWrapper, IERC20 token, address spender, uint256 amount)
+    function wrapperApprove(IFlashLoanSolverWrapper solverWrapper, IERC20 token, address spender, uint256 amount)
         internal
         pure
         returns (ICowSettlement.Interaction memory)
@@ -40,7 +40,7 @@ library CowProtocolInteraction {
         return ICowSettlement.Interaction({
             target: address(solverWrapper),
             value: 0,
-            callData: abi.encodeCall(FlashLoanSolverWrapper.approve, (token, spender, amount))
+            callData: abi.encodeCall(IFlashLoanSolverWrapper.approve, (token, spender, amount))
         });
     }
 

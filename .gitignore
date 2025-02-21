@@ -17,3 +17,6 @@ docs/
 # Build artifacts to keep
 /artifacts/*
 !/artifacts/IFlashLoanSolverWrapper.sol
+
+# Gas benchmarks
+/snapshots/*
