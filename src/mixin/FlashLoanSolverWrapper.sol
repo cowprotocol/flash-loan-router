@@ -6,13 +6,16 @@ import {ICowSettlement} from "../interface/ICowSettlement.sol";
 import {IFlashLoanSolverWrapper} from "../interface/IFlashLoanSolverWrapper.sol";
 import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
 import {IERC20} from "../vendored/IERC20.sol";
-import {TransientStorageArray} from "./TransientStorageArray.sol";
 
-abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper, TransientStorageArray {
+abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper {
+    bytes32 constant NO_SETTLEMENT = bytes32(0);
+
     /// @inheritdoc IFlashLoanSolverWrapper
     ICowSettlement public immutable settlementContract;
     /// @inheritdoc IFlashLoanSolverWrapper
     ICowAuthentication public immutable settlementAuthentication;
+
+    bytes32 internal transient settlementHash;
 
     modifier onlySettlementContract() {
         require(msg.sender == address(settlementContract), "Only callable in a settlement");
@@ -36,12 +39,15 @@ abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper, TransientSt
         onlySolver
     {
         require(selector(settlement) == ICowSettlement.settle.selector, "Only settle() is allowed");
-        require(transientStorageArrayLength() == 0, "Pending settlement");
-        storeToTransientStorageArray(settlement);
-        triggerFlashLoan(lender, loan.token, loan.amount);
-        // We clear the transient storage again in case `onFlashLoan` wasn't
-        // called by the lender contract.
-        clearTransientStorageArray();
+        require(settlementHash == NO_SETTLEMENT, "Pending settlement");
+        // Explicitly copy to memory. Otherwise, the calldata is copied twice,
+        // once for the hash and once for `triggerFlashLoan`.
+        bytes memory _settlement = settlement;
+        settlementHash = keccak256(_settlement);
+        triggerFlashLoan(lender, loan.token, loan.amount, _settlement);
+        // We clear the settlement hash in case `onFlashLoan` wasn't called by
+        // the lender contract.
+        settlementHash = NO_SETTLEMENT;
     }
 
     /// @inheritdoc IFlashLoanSolverWrapper
@@ -50,12 +56,12 @@ abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper, TransientSt
         require(token.approve(target, amount), "Approval failed");
     }
 
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount) internal virtual;
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory settlement) internal virtual;
 
-    function flashLoanCallback() internal {
-        bytes memory settlement = readTransientStorageArray();
+    function flashLoanCallback(bytes memory settlement) internal {
         require(settlement.length > 0, "No settlement pending");
-        clearTransientStorageArray();
+        require(keccak256(settlement) == settlementHash, "Settlement hash not matching");
+        settlementHash = NO_SETTLEMENT;
         (bool result,) = address(settlementContract).call(settlement);
         // Todo: pass through error message.
         require(result, "Settlement reverted");
