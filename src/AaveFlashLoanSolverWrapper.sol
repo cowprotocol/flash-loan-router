@@ -11,7 +11,10 @@ import {IERC20} from "./vendored/IERC20.sol";
 contract AaveFlashLoanSolverWrapper is FlashLoanSolverWrapper, IAaveFlashLoanReceiver {
     constructor(ICowSettlement _settlementContract) FlashLoanSolverWrapper(_settlementContract) {}
 
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount) internal override {
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory settlement)
+        internal
+        override
+    {
         // For documentation on the call parameters, see:
         // <https://aave.com/docs/developers/smart-contracts/pool#write-methods-flashloan-input-parameters>
         IAaveFlashLoanReceiver receiverAddress = this;
@@ -24,7 +27,7 @@ contract AaveFlashLoanSolverWrapper is FlashLoanSolverWrapper, IAaveFlashLoanRec
         interestRateModes[0] = 0;
         // The next value is technically unused, since `interestRateMode` is 0.
         address onBehalfOf = address(this);
-        bytes memory params = hex"";
+        bytes memory params = settlement;
         // Referral supply is currently inactive
         uint16 referralCode = 0;
         IAavePool(lender).flashLoan(
@@ -33,11 +36,14 @@ contract AaveFlashLoanSolverWrapper is FlashLoanSolverWrapper, IAaveFlashLoanRec
     }
 
     /// @inheritdoc IAaveFlashLoanReceiver
-    function executeOperation(address[] calldata, uint256[] calldata, uint256[] calldata, address, bytes calldata)
-        external
-        returns (bool)
-    {
-        flashLoanCallback();
+    function executeOperation(
+        address[] calldata,
+        uint256[] calldata,
+        uint256[] calldata,
+        address,
+        bytes calldata settlement
+    ) external returns (bool) {
+        flashLoanCallback(settlement);
         return true;
     }
 }

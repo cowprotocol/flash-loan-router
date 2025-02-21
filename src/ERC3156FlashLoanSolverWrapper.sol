@@ -15,14 +15,17 @@ contract ERC3156FlashLoanSolverWrapper is FlashLoanSolverWrapper, IERC3156FlashB
 
     constructor(ICowSettlement _settlementContract) FlashLoanSolverWrapper(_settlementContract) {}
 
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount) internal override {
-        bool success = IERC3156FlashLender(lender).flashLoan(this, address(token), amount, hex"");
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory settlement)
+        internal
+        override
+    {
+        bool success = IERC3156FlashLender(lender).flashLoan(this, address(token), amount, settlement);
         require(success, "Flash loan was unsuccessful");
     }
 
     /// @inheritdoc IERC3156FlashBorrower
-    function onFlashLoan(address, address, uint256, uint256, bytes calldata) external returns (bytes32) {
-        flashLoanCallback();
+    function onFlashLoan(address, address, uint256, uint256, bytes calldata settlement) external returns (bytes32) {
+        flashLoanCallback(settlement);
         return ERC3156_ONFLASHLOAN_SUCCESS;
     }
 }
