@@ -22,6 +22,13 @@ To exclude tests requiring an internet connection:
 $ forge test --no-match-path 'test/e2e/**/*'
 ```
 
+### Gas benchmarking
+
+This repository includes benchmarking to estimate the gas cost of using the different flash-loan wrappers solvers.
+Benchmark results are generated automatically when running tests.
+The generated data can be found in the `snapshots/` folder.
+This data is not checked into this repository.
+
 ### Format
 
 ```shell
