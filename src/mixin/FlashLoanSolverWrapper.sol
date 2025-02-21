@@ -8,14 +8,12 @@ import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
 import {IERC20} from "../vendored/IERC20.sol";
 
 abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper {
-    bytes32 constant NO_SETTLEMENT = bytes32(0);
-
     /// @inheritdoc IFlashLoanSolverWrapper
     ICowSettlement public immutable settlementContract;
     /// @inheritdoc IFlashLoanSolverWrapper
     ICowAuthentication public immutable settlementAuthentication;
 
-    bytes32 internal transient settlementHash;
+    bool internal transient inFlight;
 
     modifier onlySettlementContract() {
         require(msg.sender == address(settlementContract), "Only callable in a settlement");
@@ -39,15 +37,12 @@ abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper {
         onlySolver
     {
         require(selector(settlement) == ICowSettlement.settle.selector, "Only settle() is allowed");
-        require(settlementHash == NO_SETTLEMENT, "Pending settlement");
-        // Explicitly copy to memory. Otherwise, the calldata is copied twice,
-        // once for the hash and once for `triggerFlashLoan`.
-        bytes memory _settlement = settlement;
-        settlementHash = keccak256(_settlement);
-        triggerFlashLoan(lender, loan.token, loan.amount, _settlement);
-        // We clear the settlement hash in case `onFlashLoan` wasn't called by
+        require(!inFlight, "Pending settlement");
+        inFlight = true;
+        triggerFlashLoan(lender, loan.token, loan.amount, settlement);
+        // We clear the in-flight status in case `onFlashLoan` wasn't called by
         // the lender contract.
-        settlementHash = NO_SETTLEMENT;
+        inFlight = false;
     }
 
     /// @inheritdoc IFlashLoanSolverWrapper
@@ -59,9 +54,8 @@ abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper {
     function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory settlement) internal virtual;
 
     function flashLoanCallback(bytes memory settlement) internal {
-        require(settlement.length > 0, "No settlement pending");
-        require(keccak256(settlement) == settlementHash, "Settlement hash not matching");
-        settlementHash = NO_SETTLEMENT;
+        require(inFlight, "No settlement pending");
+        inFlight = false;
         (bool result,) = address(settlementContract).call(settlement);
         // Todo: pass through error message.
         require(result, "Settlement reverted");
