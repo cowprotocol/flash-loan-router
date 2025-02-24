@@ -14,8 +14,12 @@ docs/
 .env
 
 
-# Build artifacts to keep
+# Only retain selected build artifacts
 /artifacts/*
+# Wrapper solver interface and all concrete implementations
 !/artifacts/IFlashLoanSolverWrapper.sol
 !/artifacts/AaveFlashLoanSolverWrapper.sol
 !/artifacts/ERC3156FlashLoanSolverWrapper.sol
+# Lender interfaces for ease of recovering flash-loan fees by the services 
+!/artifacts/IERC3156FlashLender.sol
+!/artifacts/IAavePool.sol
