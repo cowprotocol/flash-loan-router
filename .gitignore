@@ -17,3 +17,5 @@ docs/
 # Build artifacts to keep
 /artifacts/*
 !/artifacts/IFlashLoanSolverWrapper.sol
+!/artifacts/AaveFlashLoanSolverWrapper.sol
+!/artifacts/ERC3156FlashLoanSolverWrapper.sol
