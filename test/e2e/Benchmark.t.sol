@@ -5,6 +5,7 @@ import {Test, Vm} from "forge-std/Test.sol";
 
 import {AaveFlashLoanSolverWrapper, IAavePool} from "src/AaveFlashLoanSolverWrapper.sol";
 import {ERC3156FlashLoanSolverWrapper, IERC3156FlashLender} from "src/ERC3156FlashLoanSolverWrapper.sol";
+import {FlashLoanRouter, LoanRequest} from "src/FlashLoanRouter.sol";
 import {ICowSettlement, IERC20, IFlashLoanSolverWrapper} from "src/interface/IFlashLoanSolverWrapper.sol";
 
 import {Constants} from "./lib/Constants.sol";
@@ -28,12 +29,14 @@ abstract contract BenchmarkFixture is Test {
     address private solver = makeAddr("BenchmarkFixture: solver");
 
     IFlashLoanSolverWrapper private immutable solverWrapper;
+    FlashLoanRouter internal router;
     IERC20 private immutable token;
     address private immutable lender;
     string private benchGroup;
 
     constructor(IERC20 _token, address _lender, string memory _benchGroup) {
         vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
+        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
         solverWrapper = deploySolverWrapper();
         token = _token;
         lender = _lender;
@@ -44,7 +47,7 @@ abstract contract BenchmarkFixture is Test {
 
     function setUp() external {
         CowProtocol.addSolver(vm, solver);
-        CowProtocol.addSolver(vm, address(solverWrapper));
+        CowProtocol.addSolver(vm, address(router));
         // The following is a transaction that is expected to happen only once
         // per token and per lender, which is why we exclude it from the
         // benchmark.
@@ -102,12 +105,14 @@ abstract contract BenchmarkFixture is Test {
             ICowSettlement.Interaction({target: address(0), value: 0, callData: new bytes(extraDataSize)});
 
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
-        IFlashLoanSolverWrapper.LoanRequest memory loanRequest =
-            IFlashLoanSolverWrapper.LoanRequest(token, loanedAmount);
+
+        LoanRequest.Data[] memory loans = new LoanRequest.Data[](1);
+        loans[0] = LoanRequest.Data({amount: loanedAmount, borrower: solverWrapper, lender: lender, token: token});
 
         vm.prank(solver);
         vm.startSnapshotGas(string.concat("E2eBenchmark", benchGroup), name);
-        solverWrapper.flashLoanAndSettle(lender, loanRequest, settleCallData);
+        router.flashLoanAndSettle(loans, settleCallData);
+
         vm.stopSnapshotGas();
     }
 
@@ -180,7 +185,7 @@ contract E2eBenchmarkMaker is BenchmarkFixture {
     constructor() BenchmarkFixture(Constants.DAI, address(MAKER_FLASH_LOAN_CONTRACT), "Maker") {}
 
     function deploySolverWrapper() internal override returns (IFlashLoanSolverWrapper solverWrapper) {
-        solverWrapper = new ERC3156FlashLoanSolverWrapper(Constants.SETTLEMENT_CONTRACT);
+        solverWrapper = new ERC3156FlashLoanSolverWrapper(router);
     }
 }
 
@@ -190,6 +195,6 @@ contract E2eBenchmarkAave is BenchmarkFixture {
     constructor() BenchmarkFixture(Constants.WETH, address(AAVE_WETH_POOL), "Aave") {}
 
     function deploySolverWrapper() internal override returns (IFlashLoanSolverWrapper solverWrapper) {
-        solverWrapper = new AaveFlashLoanSolverWrapper(Constants.SETTLEMENT_CONTRACT);
+        solverWrapper = new AaveFlashLoanSolverWrapper(router);
     }
 }

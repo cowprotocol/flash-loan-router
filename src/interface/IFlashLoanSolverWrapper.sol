@@ -37,10 +37,15 @@ interface IFlashLoanSolverWrapper {
     /// called. All of this is also the case if the lender is untrusted.
     /// @param lender The address of the flash-loan lender from which to borrow.
     /// @param loan The parameters describing the requested loan.
-    /// @param settlement The call data for a call to the `settle()` function
-    /// in the CoW Protocol settlement contract. It fully describes a CoW
-    /// Protocol settlement.
-    function flashLoanAndSettle(address lender, LoanRequest calldata loan, bytes calldata settlement) external;
+    /// @param callbackDataHash The keccak256 hash of the input callback data.
+    /// @param callbackData The data to send back when calling the router once
+    /// the loan is received.
+    function flashLoanAndCallBack(
+        address lender,
+        LoanRequest calldata loan,
+        bytes32 callbackDataHash,
+        bytes calldata callbackData
+    ) external;
 
     /// @notice Approves the target address to spend the specified token on
     /// behalf of the flash-loan solver wrapper up to the specified amount.
@@ -55,8 +60,4 @@ interface IFlashLoanSolverWrapper {
     /// @notice The settlement contract that will be called when a settlement is
     /// executed after a flash loan.
     function settlementContract() external returns (ICowSettlement);
-
-    /// @notice The contract responsible to determine which address is an
-    /// authorized solver for CoW Protocol.
-    function settlementAuthentication() external returns (ICowAuthentication);
 }
