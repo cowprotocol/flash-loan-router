@@ -2,16 +2,16 @@
 
 pragma solidity ^0.8;
 
-import {ICowSettlement} from "./interface/ICowSettlement.sol";
+import {IFlashLoanRouter} from "./interface/IFlashLoanRouter.sol";
 import {FlashLoanSolverWrapper} from "./mixin/FlashLoanSolverWrapper.sol";
 import {IAaveFlashLoanReceiver} from "./vendored/IAaveFlashLoanReceiver.sol";
 import {IAavePool} from "./vendored/IAavePool.sol";
 import {IERC20} from "./vendored/IERC20.sol";
 
 contract AaveFlashLoanSolverWrapper is FlashLoanSolverWrapper, IAaveFlashLoanReceiver {
-    constructor(ICowSettlement _settlementContract) FlashLoanSolverWrapper(_settlementContract) {}
+    constructor(IFlashLoanRouter _router) FlashLoanSolverWrapper(_router) {}
 
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory settlement)
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory callbackData)
         internal
         override
     {
@@ -27,7 +27,7 @@ contract AaveFlashLoanSolverWrapper is FlashLoanSolverWrapper, IAaveFlashLoanRec
         interestRateModes[0] = 0;
         // The next value is technically unused, since `interestRateMode` is 0.
         address onBehalfOf = address(this);
-        bytes memory params = settlement;
+        bytes memory params = callbackData;
         // Referral supply is currently inactive
         uint16 referralCode = 0;
         IAavePool(lender).flashLoan(
@@ -41,9 +41,9 @@ contract AaveFlashLoanSolverWrapper is FlashLoanSolverWrapper, IAaveFlashLoanRec
         uint256[] calldata,
         uint256[] calldata,
         address,
-        bytes calldata settlement
+        bytes calldata callbackData
     ) external returns (bool) {
-        flashLoanCallback(settlement);
+        flashLoanCallback(callbackData);
         return true;
     }
 }

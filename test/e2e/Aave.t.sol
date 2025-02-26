@@ -3,8 +3,9 @@ pragma solidity ^0.8;
 
 import {Test, Vm} from "forge-std/Test.sol";
 
-import {AaveFlashLoanSolverWrapper, IAavePool, ICowSettlement, IERC20} from "src/AaveFlashLoanSolverWrapper.sol";
-import {IFlashLoanSolverWrapper} from "src/interface/IFlashLoanSolverWrapper.sol";
+import {AaveFlashLoanSolverWrapper, IAavePool, IERC20} from "src/AaveFlashLoanSolverWrapper.sol";
+import {FlashLoanRouter, LoanRequest} from "src/FlashLoanRouter.sol";
+import {ICowSettlement, IFlashLoanSolverWrapper} from "src/interface/IFlashLoanSolverWrapper.sol";
 
 import {Constants} from "./lib/Constants.sol";
 import {CowProtocol} from "./lib/CowProtocol.sol";
@@ -32,6 +33,7 @@ contract E2eAave is Test {
 
     AaveFlashLoanSolverWrapper private solverWrapper;
     TokenBalanceAccumulator private tokenBalanceAccumulator;
+    FlashLoanRouter private router;
 
     function setUp() external {
         vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
@@ -41,11 +43,12 @@ contract E2eAave is Test {
     }
 
     function prepareSolverWrapper() private {
-        solverWrapper = new AaveFlashLoanSolverWrapper(Constants.SETTLEMENT_CONTRACT);
+        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+        solverWrapper = new AaveFlashLoanSolverWrapper(router);
 
         // The solver wrapper must be a solver because it directly calls
         // `settle`.
-        CowProtocol.addSolver(vm, address(solverWrapper));
+        CowProtocol.addSolver(vm, address(router));
 
         // Call `approve` from the settlement contract so that WETH can be spent
         // on a settlement interaction on behalf of the solver wrapper. With an
@@ -121,10 +124,16 @@ contract E2eAave is Test {
 
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
+        LoanRequest.Data[] memory loans = new LoanRequest.Data[](1);
+        loans[0] = LoanRequest.Data({
+            amount: loanedAmount,
+            borrower: solverWrapper,
+            lender: address(AAVE_WETH_POOL),
+            token: Constants.WETH
+        });
+
         vm.prank(solver);
-        IFlashLoanSolverWrapper.LoanRequest memory loanRequest =
-            IFlashLoanSolverWrapper.LoanRequest(Constants.WETH, loanedAmount);
-        solverWrapper.flashLoanAndSettle(address(AAVE_WETH_POOL), loanRequest, settleCallData);
+        router.flashLoanAndSettle(loans, settleCallData);
 
         tokenBalanceAccumulator.assertAccumulatorEq(vm, expectedBalances);
         assertEq(

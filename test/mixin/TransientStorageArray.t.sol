@@ -7,23 +7,12 @@ import {BusyStoreAndRead, BusyTransientStorage} from "./TransientStorageArray/Bu
 import {
     BYTES_IN_WORD,
     ExposedTransientStorageArray,
-    StoreAndRead,
-    sequentialByteArrayOfSize
+    StoreAndRead
 } from "./TransientStorageArray/ExposedTransientStorageArray.sol";
+import {BytesUtils} from "test/test-lib/BytesUtils.sol";
 
 contract TransientStorageArrayTest is Test {
-    uint256 seed = 0;
-
     StoreAndRead executor;
-
-    function pseudorandomByteArrayOfSize(uint256 length) internal returns (bytes memory data) {
-        uint256 currentSeed = seed;
-        data = new bytes(length);
-        for (uint256 i = 0; i < length; i++) {
-            data[i] = abi.encode(keccak256(abi.encodePacked(currentSeed, length, i)))[0];
-        }
-        seed = currentSeed + 1;
-    }
 
     function setUp() public {
         executor = new StoreAndRead(new ExposedTransientStorageArray());
@@ -42,35 +31,35 @@ contract TransientStorageArrayTest is Test {
     }
 
     function test_singleWordArray() external {
-        checkRoundTrip(sequentialByteArrayOfSize(BYTES_IN_WORD));
+        checkRoundTrip(BytesUtils.sequentialByteArrayOfSize(BYTES_IN_WORD));
     }
 
     function test_oneByteAndASingleWordArray() external {
-        checkRoundTrip(sequentialByteArrayOfSize(BYTES_IN_WORD + 1));
+        checkRoundTrip(BytesUtils.sequentialByteArrayOfSize(BYTES_IN_WORD + 1));
     }
 
     function test_largeArrayWordMultiple() external {
-        checkRoundTrip(sequentialByteArrayOfSize(BYTES_IN_WORD * 1337));
+        checkRoundTrip(BytesUtils.sequentialByteArrayOfSize(BYTES_IN_WORD * 1337));
     }
 
     function test_largeArrayNotWordMultiple() external {
-        checkRoundTrip(sequentialByteArrayOfSize(BYTES_IN_WORD * 1337 + 1));
+        checkRoundTrip(BytesUtils.sequentialByteArrayOfSize(BYTES_IN_WORD * 1337 + 1));
     }
 
     function test_veryLargeArrays() external {
         // The maximum size of the array is bounded by the gas block size.
         // If this test fails with `EvmError: MemoryOOG`, it likely means that
         // the transaction doesn't fit the block.
-        checkRoundTrip(sequentialByteArrayOfSize(80000 * BYTES_IN_WORD + 1));
+        checkRoundTrip(BytesUtils.sequentialByteArrayOfSize(80000 * BYTES_IN_WORD + 1));
     }
 
     function test_keepsTrackOfLength() external {
-        executor.checkLength(vm, sequentialByteArrayOfSize(BYTES_IN_WORD * 42));
+        executor.checkLength(vm, BytesUtils.sequentialByteArrayOfSize(BYTES_IN_WORD * 42));
     }
 
     function test_lengthChangesWhenOverriding() external {
-        bytes memory short = sequentialByteArrayOfSize(4242);
-        bytes memory long = sequentialByteArrayOfSize(31337);
+        bytes memory short = BytesUtils.sequentialByteArrayOfSize(4242);
+        bytes memory long = BytesUtils.sequentialByteArrayOfSize(31337);
         executor.checkOverriddenLength(vm, short, long);
         executor.checkOverriddenLength(vm, long, short);
     }

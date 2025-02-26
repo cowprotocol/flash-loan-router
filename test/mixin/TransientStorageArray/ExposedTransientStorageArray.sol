@@ -4,6 +4,7 @@ pragma solidity ^0.8;
 import {Vm} from "forge-std/Test.sol";
 
 import {TransientStorageArray} from "src/mixin/TransientStorageArray.sol";
+import {BytesUtils} from "test/test-lib/BytesUtils.sol";
 
 /// @dev This contract exposes all internal methods of TransientStorageArray.
 contract ExposedTransientStorageArray is TransientStorageArray {
@@ -25,13 +26,6 @@ contract ExposedTransientStorageArray is TransientStorageArray {
 }
 
 uint256 constant BYTES_IN_WORD = 32;
-
-function sequentialByteArrayOfSize(uint256 length) pure returns (bytes memory data) {
-    data = new bytes(length);
-    for (uint256 i = 0; i < length; i++) {
-        data[i] = bytes1(uint8(i));
-    }
-}
 
 /// @dev We use this contract to store to transient storage and read from it in
 /// the same transaction. A dedicated contract for this is only needed when
@@ -115,7 +109,7 @@ contract StoreAndRead {
         uint256 populatedBytesCount = 2 * BYTES_IN_WORD;
         uint256 calldataBytesLength = BYTES_IN_WORD + 1;
         // The following ia a manual implementation of:
-        // abi.encodeCall(ExposedTransientStorageArray.store, sequentialByteArrayOfSize(calldataBytesLength));
+        // abi.encodeCall(ExposedTransientStorageArray.store, BytesUtils.sequentialByteArrayOfSize(calldataBytesLength));
         // except that the last (BYTES_IN_WORD - 1) bytes aren't filled with
         // zeroes but are filled with nonzero sequential bytes to the end of the
         // bytes array last word.
@@ -123,12 +117,12 @@ contract StoreAndRead {
             ExposedTransientStorageArray.store.selector,
             calldataArrayOffset,
             calldataBytesLength,
-            sequentialByteArrayOfSize(populatedBytesCount)
+            BytesUtils.sequentialByteArrayOfSize(populatedBytesCount)
         );
 
-        bytes memory expectedStoredData = sequentialByteArrayOfSize(calldataBytesLength);
+        bytes memory expectedStoredData = BytesUtils.sequentialByteArrayOfSize(calldataBytesLength);
 
-        // This is `tsa.store(sequentialByteArrayOfSize(expectedStoredData))`
+        // This is `tsa.store(BytesUtils.sequentialByteArrayOfSize(expectedStoredData))`
         // with the byte array manipulation explained above.
         (bool success,) = address(tsa).call(storeCalldata);
 
