@@ -11,7 +11,7 @@ import {IERC20} from "./vendored/IERC20.sol";
 
 contract FlashLoanRouter is IFlashLoanRouter {
     using BytesUtil for bytes;
-    using LoansWithSettlement for bytes;
+    using LoansWithSettlement for LoansWithSettlement.Data;
 
     IFlashLoanSolverWrapper NO_PENDING_BORROWER = IFlashLoanSolverWrapper(address(0));
 
@@ -39,7 +39,7 @@ contract FlashLoanRouter is IFlashLoanRouter {
     }
 
     function flashLoanAndSettle(LoanRequest.Data[] calldata loans, bytes calldata settlement) external onlySolver {
-        bytes memory encodedLoansWithSettlement = LoansWithSettlement.encodeLoansWithSettlement(loans, settlement);
+        bytes memory encodedLoansWithSettlement = abi.encode(LoansWithSettlement.encodeLoansWithSettlement(loans, settlement));
         borrowNextLoan(encodedLoansWithSettlement);
     }
 
@@ -50,11 +50,13 @@ contract FlashLoanRouter is IFlashLoanRouter {
     }
 
     function borrowNextLoan(bytes memory encodedLoansWithSettlement) private {
-        if (encodedLoansWithSettlement.loansCount() == 0) {
-            settle(encodedLoansWithSettlement.destroyAndExtractSettlement());
+        LoansWithSettlement.Data memory loansWithSettlement = abi.decode(encodedLoansWithSettlement, (LoansWithSettlement.Data));
+        if (loansWithSettlement.loans.length == 0) {
+            settle(loansWithSettlement.settlement);
         } else {
-            LoanRequest.Data memory loan = encodedLoansWithSettlement.popLoanRequest();
+            LoanRequest.Data memory loan = loansWithSettlement.popLoanRequest();
             IFlashLoanSolverWrapper borrower = loan.borrower;
+            encodedLoansWithSettlement = abi.encode(loansWithSettlement);
             bytes32 dataHash = keccak256(encodedLoansWithSettlement);
             pendingBorrower = borrower;
             pendingDataHash = dataHash;
