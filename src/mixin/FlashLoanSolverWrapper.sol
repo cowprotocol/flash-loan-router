@@ -9,13 +9,11 @@ import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
 import {IERC20} from "../vendored/IERC20.sol";
 
 abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper {
-    bytes32 constant NO_DATA = bytes32(0);
-
     IFlashLoanRouter public immutable router;
     /// @inheritdoc IFlashLoanSolverWrapper
     ICowSettlement public immutable settlementContract;
 
-    bytes32 internal transient callbackDataHash;
+    bool internal transient inTransit;
 
     modifier onlySettlementContract() {
         require(msg.sender == address(settlementContract), "Only callable in a settlement");
@@ -33,18 +31,16 @@ abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper {
     }
 
     /// @inheritdoc IFlashLoanSolverWrapper
-    function flashLoanAndCallBack(
-        address lender,
-        LoanRequest calldata loan,
-        bytes32 _callbackDataHash,
-        bytes calldata callbackData
-    ) external onlyRouter {
-        require(callbackDataHash == NO_DATA, "Pending callback");
-        callbackDataHash = _callbackDataHash;
+    function flashLoanAndCallBack(address lender, LoanRequest calldata loan, bytes calldata callbackData)
+        external
+        onlyRouter
+    {
+        require(inTransit == false, "Pending callback");
+        inTransit = true;
         triggerFlashLoan(lender, loan.token, loan.amount, callbackData);
         // We clear the callback hash in case `onFlashLoan` wasn't called by
         // the lender contract.
-        callbackDataHash = NO_DATA;
+        inTransit = false;
     }
 
     /// @inheritdoc IFlashLoanSolverWrapper
@@ -58,8 +54,7 @@ abstract contract FlashLoanSolverWrapper is IFlashLoanSolverWrapper {
         virtual;
 
     function flashLoanCallback(bytes memory callbackData) internal {
-        require(keccak256(callbackData) == callbackDataHash, "Callback data hash not matching");
-        callbackDataHash = NO_DATA;
+        inTransit = false;
         router.borrowerCallback(callbackData);
     }
 }

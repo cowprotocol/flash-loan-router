@@ -37,13 +37,11 @@ interface IFlashLoanSolverWrapper {
     /// called. All of this is also the case if the lender is untrusted.
     /// @param lender The address of the flash-loan lender from which to borrow.
     /// @param loan The parameters describing the requested loan.
-    /// @param callbackDataHash The keccak256 hash of the input callback data.
     /// @param callbackData The data to send back when calling the router once
     /// the loan is received.
     function flashLoanAndCallBack(
         address lender,
         LoanRequest calldata loan,
-        bytes32 callbackDataHash,
         bytes calldata callbackData
     ) external;
 
