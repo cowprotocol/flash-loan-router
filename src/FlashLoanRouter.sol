@@ -19,7 +19,7 @@ contract FlashLoanRouter is IFlashLoanRouter {
     ICowAuthentication public immutable settlementAuthentication;
 
     IFlashLoanSolverWrapper private transient pendingBorrower;
-    bytes32 private transient pendingDataHash;
+    bytes32 private transient settlementHash;
 
     modifier onlySolver() {
         // Todo: investigate security implication of self calls.
@@ -40,27 +40,27 @@ contract FlashLoanRouter is IFlashLoanRouter {
 
     function flashLoanAndSettle(LoanRequest.Data[] calldata loans, bytes calldata settlement) external onlySolver {
         bytes memory encodedLoansWithSettlement = LoansWithSettlement.encodeLoansWithSettlement(loans, settlement);
+        settlementHash = encodedLoansWithSettlement.settlementHash();
         borrowNextLoan(encodedLoansWithSettlement);
     }
 
     function borrowerCallback(bytes memory encodedLoansWithSettlement) external onlyPendingBorrower {
         pendingBorrower = NO_PENDING_BORROWER;
-        require(keccak256(encodedLoansWithSettlement) == pendingDataHash, "Bad data from borrower");
         borrowNextLoan(encodedLoansWithSettlement);
     }
 
     function borrowNextLoan(bytes memory encodedLoansWithSettlement) private {
         if (encodedLoansWithSettlement.loansCount() == 0) {
+            require(encodedLoansWithSettlement.settlementHash() == settlementHash, "Bad settlement hash");
             settle(encodedLoansWithSettlement.destroyAndExtractSettlement());
+            settlementHash = 0;
         } else {
             LoanRequest.Data memory loan = encodedLoansWithSettlement.popLoanRequest();
             IFlashLoanSolverWrapper borrower = loan.borrower;
-            bytes32 dataHash = keccak256(encodedLoansWithSettlement);
             pendingBorrower = borrower;
-            pendingDataHash = dataHash;
             IFlashLoanSolverWrapper.LoanRequest memory loanRequest =
                 IFlashLoanSolverWrapper.LoanRequest({token: loan.token, amount: loan.amount});
-            borrower.flashLoanAndCallBack(loan.lender, loanRequest, dataHash, encodedLoansWithSettlement);
+            borrower.flashLoanAndCallBack(loan.lender, loanRequest, encodedLoansWithSettlement);
         }
     }
 
