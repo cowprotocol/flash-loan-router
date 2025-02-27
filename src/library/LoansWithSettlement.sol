@@ -195,4 +195,21 @@ library LoansWithSettlement {
             settlement := settlementOffset
         }
     }
+
+    function settlementHash(bytes memory loansWithSettlement) internal pure returns (bytes32 hash) {
+        // We assume that the input is loans with a settlement, encoded as
+        // expected by this library. The settlement data is a subarray of the
+        // input: if we accept to override the input data with arbitrary value,
+        // we can carve out a valid ABI-encoded bytes array representing the
+        // settlement.
+        uint256 settlementLength = loansWithSettlement.length - LOAN_COUNT_SIZE
+            - loansCount(loansWithSettlement) * LoanRequest.ENCODED_LOAN_REQUEST_BYTE_SIZE;
+        // We rely on the fact that LOAN_COUNT_SIZE is 32, exactly the size
+        // needed to store the length of a memory array.
+        uint256 settlementOffset = loansWithSettlement.memoryPointerToContent();
+
+        assembly ("memory-safe") {
+            hash := keccak256(add(settlementOffset, LOAN_COUNT_SIZE), settlementLength)
+        }
+    }
 }
