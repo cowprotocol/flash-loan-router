@@ -13,36 +13,16 @@ import {CowProtocolInteraction} from "./lib/CowProtocolInteraction.sol";
 import {ForkedRpc} from "./lib/ForkedRpc.sol";
 import {TokenBalanceAccumulator} from "./lib/TokenBalanceAccumulator.sol";
 
-/// @dev Documentation for the ERC-3156-compatible flash loans by Maker can be
-/// found at:
-/// <https://docs.makerdao.com/smart-contract-modules/flash-mint-module>
-contract E2eMaker is Test {
-    using ForkedRpc for Vm;
-
-    uint256 private constant MAINNET_FORK_BLOCK = 21765553;
+library MakerSetup {
     // https://docs.makerdao.com/smart-contract-modules/flash-mint-module
-    IERC3156FlashLender private constant MAKER_FLASH_LOAN_CONTRACT =
+    IERC3156FlashLender internal constant FLASH_LOAN_CONTRACT =
         IERC3156FlashLender(0x60744434d6339a6B27d73d9Eda62b6F66a0a04FA);
-    address private solver = makeAddr("E2eBalancerV2: solver");
 
-    ERC3156FlashLoanSolverWrapper private solverWrapper;
-    TokenBalanceAccumulator private tokenBalanceAccumulator;
-    FlashLoanRouter private router;
-
-    function setUp() external {
-        vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
-        CowProtocol.addSolver(vm, solver);
-        tokenBalanceAccumulator = new TokenBalanceAccumulator();
-        prepareSolverWrapper();
-    }
-
-    function prepareSolverWrapper() private {
-        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+    function prepareSolverWrapper(Vm vm, FlashLoanRouter router, address solver)
+        internal
+        returns (ERC3156FlashLoanSolverWrapper solverWrapper)
+    {
         solverWrapper = new ERC3156FlashLoanSolverWrapper(router);
-
-        // The solver wrapper must be a solver because it directly calls
-        // `settle`.
-        CowProtocol.addSolver(vm, address(router));
 
         // Call `approve` from the settlement contract so that DAI can be spent
         // on a settlement interaction on behalf of the solver wrapper. With an
@@ -55,11 +35,34 @@ contract E2eMaker is Test {
         vm.prank(solver);
         CowProtocol.emptySettleWithInteractions(onlyApprove);
     }
+}
+
+/// @dev Documentation for the ERC-3156-compatible flash loans by Maker can be
+/// found at:
+/// <https://docs.makerdao.com/smart-contract-modules/flash-mint-module>
+contract E2eMaker is Test {
+    using ForkedRpc for Vm;
+
+    uint256 private constant MAINNET_FORK_BLOCK = 21765553;
+    address private solver = makeAddr("E2eBalancerV2: solver");
+
+    ERC3156FlashLoanSolverWrapper private solverWrapper;
+    TokenBalanceAccumulator private tokenBalanceAccumulator;
+    FlashLoanRouter private router;
+
+    function setUp() external {
+        vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
+        tokenBalanceAccumulator = new TokenBalanceAccumulator();
+        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+        CowProtocol.addSolver(vm, solver);
+        CowProtocol.addSolver(vm, address(router));
+        solverWrapper = MakerSetup.prepareSolverWrapper(vm, router, solver);
+    }
 
     function test_settleWithFlashLoan() external {
         uint256 loanedAmount = 10_000 ether; // $10,000
 
-        uint256 flashFee = MAKER_FLASH_LOAN_CONTRACT.flashFee(address(Constants.DAI), loanedAmount);
+        uint256 flashFee = MakerSetup.FLASH_LOAN_CONTRACT.flashFee(address(Constants.DAI), loanedAmount);
         // Flash loan fees are always zero in the Maker contract. We just need
         // to repay the borrowed collateral at the end.
         // <https://etherscan.io/address/0x07df2ad9878F8797B4055230bbAE5C808b8259b3#code#F1#L31>
@@ -104,7 +107,7 @@ contract E2eMaker is Test {
         // loan borrower holds the funds and has approved its contract for
         // withdrawing funds.
         interactionsWithFlashLoan[4] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.DAI, address(MAKER_FLASH_LOAN_CONTRACT), loanedAmount
+            solverWrapper, Constants.DAI, address(MakerSetup.FLASH_LOAN_CONTRACT), loanedAmount
         );
         // Sixth and finally, send the funds to the solver wrapper for repayment
         // of the loan.
@@ -117,7 +120,7 @@ contract E2eMaker is Test {
         loans[0] = LoanRequest.Data({
             amount: loanedAmount,
             borrower: solverWrapper,
-            lender: address(MAKER_FLASH_LOAN_CONTRACT),
+            lender: address(MakerSetup.FLASH_LOAN_CONTRACT),
             token: Constants.DAI
         });
 

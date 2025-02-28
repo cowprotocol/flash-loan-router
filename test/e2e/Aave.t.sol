@@ -13,42 +13,18 @@ import {CowProtocolInteraction} from "./lib/CowProtocolInteraction.sol";
 import {ForkedRpc} from "./lib/ForkedRpc.sol";
 import {TokenBalanceAccumulator} from "./lib/TokenBalanceAccumulator.sol";
 
-/// @dev Documentation for the ERC-3156-compatible flash loans by Maker can be
-/// found at:
-/// <https://docs.makerdao.com/smart-contract-modules/flash-mint-module>
-contract E2eAave is Test {
-    using ForkedRpc for Vm;
-
-    // This is the block immediately before a mainnet fee withdrawal:
-    // <https://etherscan.io/tx/0x2ac75cbf67d74ae3ad736314acb9dba170922849d411cc7ccbe81e4e0cff157e>
-    // It guarantees that there are some WETH available in the buffers to pay
-    // for the flash loan.
-    uint256 private constant MAINNET_FORK_BLOCK = 21883877;
+library AaveSetup {
     // The pool address is retrieved from the Aave aToken address corresponding
     // to the desired collateral through the POOL() function. The token address
     // can retrieved from the web interface:
     // https://app.aave.com/reserve-overview/?underlyingAsset=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&marketName=proto_mainnet_v3
-    IAavePool private constant AAVE_WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
-    address private solver = makeAddr("E2eAaveV2: solver");
+    IAavePool internal constant WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
 
-    AaveFlashLoanSolverWrapper private solverWrapper;
-    TokenBalanceAccumulator private tokenBalanceAccumulator;
-    FlashLoanRouter private router;
-
-    function setUp() external {
-        vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
-        CowProtocol.addSolver(vm, solver);
-        tokenBalanceAccumulator = new TokenBalanceAccumulator();
-        prepareSolverWrapper();
-    }
-
-    function prepareSolverWrapper() private {
-        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+    function prepareSolverWrapper(Vm vm, FlashLoanRouter router, address solver)
+        internal
+        returns (AaveFlashLoanSolverWrapper solverWrapper)
+    {
         solverWrapper = new AaveFlashLoanSolverWrapper(router);
-
-        // The solver wrapper must be a solver because it directly calls
-        // `settle`.
-        CowProtocol.addSolver(vm, address(router));
 
         // Call `approve` from the settlement contract so that WETH can be spent
         // on a settlement interaction on behalf of the solver wrapper. With an
@@ -61,6 +37,33 @@ contract E2eAave is Test {
         vm.prank(solver);
         CowProtocol.emptySettleWithInteractions(onlyApprove);
     }
+}
+
+/// @dev Documentation for the ERC-3156-compatible flash loans by Maker can be
+/// found at:
+/// <https://docs.makerdao.com/smart-contract-modules/flash-mint-module>
+contract E2eAave is Test {
+    using ForkedRpc for Vm;
+
+    // This is the block immediately before a mainnet fee withdrawal:
+    // <https://etherscan.io/tx/0x2ac75cbf67d74ae3ad736314acb9dba170922849d411cc7ccbe81e4e0cff157e>
+    // It guarantees that there are some WETH available in the buffers to pay
+    // for the flash loan.
+    uint256 private constant MAINNET_FORK_BLOCK = 21883877;
+    address private solver = makeAddr("E2eAaveV2: solver");
+
+    AaveFlashLoanSolverWrapper private solverWrapper;
+    TokenBalanceAccumulator private tokenBalanceAccumulator;
+    FlashLoanRouter private router;
+
+    function setUp() external {
+        vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
+        tokenBalanceAccumulator = new TokenBalanceAccumulator();
+        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+        CowProtocol.addSolver(vm, solver);
+        CowProtocol.addSolver(vm, address(router));
+        solverWrapper = AaveSetup.prepareSolverWrapper(vm, router, solver);
+    }
 
     function test_settleWithFlashLoan() external {
         uint256 loanedAmount = 500 ether; // 500 WETH
@@ -68,7 +71,7 @@ contract E2eAave is Test {
         // Note: one unit of flash fee represents 0.1% of the borrowed amount.
         // See:
         // <https://github.com/aave-dao/aave-v3-origin/blob/v3.1.0/src/core/contracts/protocol/libraries/math/PercentageMath.sol>
-        uint256 relativeFlashFee = AAVE_WETH_POOL.FLASHLOAN_PREMIUM_TOTAL();
+        uint256 relativeFlashFee = AaveSetup.WETH_POOL.FLASHLOAN_PREMIUM_TOTAL();
         assertGt(relativeFlashFee, 0);
         uint256 absoluteFlashFee = loanedAmount * relativeFlashFee / 1000;
 
@@ -115,7 +118,7 @@ contract E2eAave is Test {
         // loan borrower holds the funds plus the expected fee and has approved
         // its contract for withdrawing this amount.
         interactionsWithFlashLoan[4] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.WETH, address(AAVE_WETH_POOL), loanedAmount + absoluteFlashFee
+            solverWrapper, Constants.WETH, address(AaveSetup.WETH_POOL), loanedAmount + absoluteFlashFee
         );
         // Sixth and finally, send the funds to the solver wrapper for repayment
         // of the loan.
@@ -128,7 +131,7 @@ contract E2eAave is Test {
         loans[0] = LoanRequest.Data({
             amount: loanedAmount,
             borrower: solverWrapper,
-            lender: address(AAVE_WETH_POOL),
+            lender: address(AaveSetup.WETH_POOL),
             token: Constants.WETH
         });
 

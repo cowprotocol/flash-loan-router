@@ -8,6 +8,8 @@ import {ERC3156FlashLoanSolverWrapper, IERC3156FlashLender} from "src/ERC3156Fla
 import {FlashLoanRouter, LoanRequest} from "src/FlashLoanRouter.sol";
 import {ICowSettlement, IERC20, IFlashLoanSolverWrapper} from "src/interface/IFlashLoanSolverWrapper.sol";
 
+import {AaveSetup} from "./Aave.t.sol";
+import {MakerSetup} from "./Maker.t.sol";
 import {Constants} from "./lib/Constants.sol";
 import {CowProtocol} from "./lib/CowProtocol.sol";
 import {CowProtocolInteraction} from "./lib/CowProtocolInteraction.sol";
@@ -26,37 +28,30 @@ uint256 constant SETTLEMENT_24H_MEDIAN_SIZE = 4442;
 abstract contract BenchmarkFixture is Test {
     using ForkedRpc for Vm;
 
-    address private solver = makeAddr("BenchmarkFixture: solver");
-
-    IFlashLoanSolverWrapper private immutable solverWrapper;
-    FlashLoanRouter internal router;
-    IERC20 private immutable token;
-    address private immutable lender;
-    string private benchGroup;
-
-    constructor(IERC20 _token, address _lender, string memory _benchGroup) {
-        vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
-        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
-        solverWrapper = deploySolverWrapper();
-        token = _token;
-        lender = _lender;
-        benchGroup = _benchGroup;
+    struct Loan {
+        IFlashLoanSolverWrapper borrower;
+        address lender;
+        IERC20 token;
     }
 
-    function deploySolverWrapper() internal virtual returns (IFlashLoanSolverWrapper);
+    address internal solver = makeAddr("BenchmarkFixture: solver");
+    FlashLoanRouter internal router;
+    Loan[] internal loans;
+    string private benchGroup;
+
+    constructor(string memory _benchGroup) {
+        vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
+        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+        CowProtocol.addSolver(vm, solver);
+        benchGroup = _benchGroup;
+        populateLoanPlan();
+    }
+
+    function populateLoanPlan() internal virtual;
 
     function setUp() external {
         CowProtocol.addSolver(vm, solver);
         CowProtocol.addSolver(vm, address(router));
-        // The following is a transaction that is expected to happen only once
-        // per token and per lender, which is why we exclude it from the
-        // benchmark.
-        ICowSettlement.Interaction[] memory onlyApprove = new ICowSettlement.Interaction[](1);
-        onlyApprove[0] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, token, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
-        );
-        vm.prank(solver);
-        CowProtocol.emptySettleWithInteractions(onlyApprove);
     }
 
     /// @param extraDataSize The size of the padding data that will be included
@@ -65,33 +60,20 @@ abstract contract BenchmarkFixture is Test {
     /// @param name An identifier that will be used to give a name to the
     /// snapshot for this run.
     function flashLoanSettleWithExtraData(uint256 extraDataSize, string memory name) private {
-        uint256 loanedAmount = 1; // Just one wei of the token
-        // We assume that the fees aren't larger than the traded amount.
-        uint256 fees = loanedAmount;
-
-        // We'll pay the fees from the buffers.
-        uint256 settlementBalance = token.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
-        assertGt(settlementBalance, fees);
-
         // Start preparing the settlement interactions.
-        ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](4);
-        // Transfer tokens out from the settlement wrapper to the settlement
-        // contract. In practice, the funds will be sent to a different address,
-        // but for the purpose of the test this should have an equivalent cost
-        // of modifying a fresh storage slot.
-        interactionsWithFlashLoan[0] = CowProtocolInteraction.transferFrom(
-            token, address(solverWrapper), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
-        );
-        // Approve repayment. Under some assumptions, this could be done once
-        // per call.
-        interactionsWithFlashLoan[1] =
-            CowProtocolInteraction.wrapperApprove(solverWrapper, token, lender, loanedAmount + fees);
-        // Prepare flash-loan repayment.
-        interactionsWithFlashLoan[2] =
-            CowProtocolInteraction.transfer(token, address(solverWrapper), loanedAmount + fees);
-        // Padding transaction. It does nothing but increase the cost of
-        // executing flash-loan in a way that is compatible with the execution
-        // of other interactions with on-chain liquidity to settle an order.
+        // The interaction plan is. for each loan:
+        // - Transfer all tokens from wrapper solver to the settlement contract.
+        //   In practice, the funds will be sent to a different address, but for
+        //   the purpose of the test this should have an equivalent cost of
+        //   modifying a fresh storage slot.
+        // - Approve repayment. Under some assumptions, this could be done once
+        //   per call.
+        // - Send back funds to the wrapper solver, including fees, for loan
+        //   repayment.
+        // And finally, a call to the zero address with padding data. It does
+        // nothing but increase the cost of executing flash-loan in a way that
+        // is compatible with the execution of other interactions with on-chain
+        // liquidity to settle an order.
         // In practice, the gas cost of these interactions will be different,
         // but that's not something that should change between the case with the
         // flash loan or without it.
@@ -101,19 +83,71 @@ abstract contract BenchmarkFixture is Test {
         // the ABI encoding of the transaction in a format compatible with a
         // `settle()` call, which has to be done regardless). However, we
         // consider the impact of this extra data overall small.
-        interactionsWithFlashLoan[3] =
+
+        ICowSettlement.Interaction[] memory interactionsWithFlashLoan =
+            new ICowSettlement.Interaction[](3 * loans.length + 1);
+
+        // We always loan just 1 wei so that we don't need to transfer funds
+        // around.
+        uint256 loanedAmount = 1;
+        // We assume that the fees aren't larger than the traded amount.
+        uint256 fees = loanedAmount;
+
+        // Sanity check: we can pay back the loan with interests from the
+        // buffers.
+        for (uint256 i = 0; i < loans.length; i++) {
+            // We'll pay the fees from the buffers.
+            uint256 settlementBalance = loans[i].token.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
+            assertGt(settlementBalance, fees);
+        }
+
+        // Keep track of the number of interactions populated so far.
+        uint256 head = 0;
+
+        for (uint256 i = 0; i < loans.length; i++) {
+            interactionsWithFlashLoan[head++] = CowProtocolInteraction.transferFrom(
+                loans[i].token, address(loans[i].borrower), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
+            );
+        }
+
+        for (uint256 i = 0; i < loans.length; i++) {
+            interactionsWithFlashLoan[head++] = CowProtocolInteraction.wrapperApprove(
+                loans[i].borrower, loans[i].token, loans[i].lender, loanedAmount + fees
+            );
+        }
+
+        for (uint256 i = 0; i < loans.length; i++) {
+            interactionsWithFlashLoan[head++] =
+                CowProtocolInteraction.transfer(loans[i].token, address(loans[i].borrower), loanedAmount + fees);
+        }
+
+        interactionsWithFlashLoan[head++] =
             ICowSettlement.Interaction({target: address(0), value: 0, callData: new bytes(extraDataSize)});
 
-        bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
+        require(
+            head == interactionsWithFlashLoan.length,
+            "Test sanity check failed: the number of included interactions doesn't match the hardcoded interaction length"
+        );
 
-        LoanRequest.Data[] memory loans = new LoanRequest.Data[](1);
-        loans[0] = LoanRequest.Data({amount: loanedAmount, borrower: solverWrapper, lender: lender, token: token});
+        bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
+        LoanRequest.Data[] memory encodedLoans = encodeLoans(loanedAmount);
 
         vm.prank(solver);
         vm.startSnapshotGas(string.concat("E2eBenchmark", benchGroup), name);
-        router.flashLoanAndSettle(loans, settleCallData);
-
+        router.flashLoanAndSettle(encodedLoans, settleCallData);
         vm.stopSnapshotGas();
+    }
+
+    function encodeLoans(uint256 amount) private view returns (LoanRequest.Data[] memory encodedLoans) {
+        encodedLoans = new LoanRequest.Data[](loans.length);
+        for (uint256 i = 0; i < loans.length; i++) {
+            encodedLoans[i] = LoanRequest.Data({
+                amount: amount,
+                borrower: loans[i].borrower,
+                lender: loans[i].lender,
+                token: loans[i].token
+            });
+        }
     }
 
     function test_settleMin() external {
@@ -179,22 +213,57 @@ contract E2eBenchmarkNoFlashLoan is Test {
 }
 
 contract E2eBenchmarkMaker is BenchmarkFixture {
-    IERC3156FlashLender private constant MAKER_FLASH_LOAN_CONTRACT =
+    IERC3156FlashLender private constant FLASH_LOAN_CONTRACT =
         IERC3156FlashLender(0x60744434d6339a6B27d73d9Eda62b6F66a0a04FA);
 
-    constructor() BenchmarkFixture(Constants.DAI, address(MAKER_FLASH_LOAN_CONTRACT), "Maker") {}
+    constructor() BenchmarkFixture("Maker") {}
 
-    function deploySolverWrapper() internal override returns (IFlashLoanSolverWrapper solverWrapper) {
-        solverWrapper = new ERC3156FlashLoanSolverWrapper(router);
+    function populateLoanPlan() internal override {
+        loans.push(
+            Loan({
+                borrower: MakerSetup.prepareSolverWrapper(vm, router, solver),
+                lender: address(MakerSetup.FLASH_LOAN_CONTRACT),
+                token: Constants.DAI
+            })
+        );
     }
 }
 
 contract E2eBenchmarkAave is BenchmarkFixture {
-    IAavePool private constant AAVE_WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+    IAavePool private constant WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
 
-    constructor() BenchmarkFixture(Constants.WETH, address(AAVE_WETH_POOL), "Aave") {}
+    constructor() BenchmarkFixture("Aave") {}
 
-    function deploySolverWrapper() internal override returns (IFlashLoanSolverWrapper solverWrapper) {
-        solverWrapper = new AaveFlashLoanSolverWrapper(router);
+    function populateLoanPlan() internal override {
+        loans.push(
+            Loan({
+                borrower: AaveSetup.prepareSolverWrapper(vm, router, solver),
+                lender: address(AaveSetup.WETH_POOL),
+                token: Constants.WETH
+            })
+        );
+    }
+}
+
+contract E2eBenchmarkAaveThenMaker is BenchmarkFixture {
+    IAavePool private constant WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+
+    constructor() BenchmarkFixture("AaveThenMaker") {}
+
+    function populateLoanPlan() internal override {
+        loans.push(
+            Loan({
+                borrower: AaveSetup.prepareSolverWrapper(vm, router, solver),
+                lender: address(AaveSetup.WETH_POOL),
+                token: Constants.WETH
+            })
+        );
+        loans.push(
+            Loan({
+                borrower: MakerSetup.prepareSolverWrapper(vm, router, solver),
+                lender: address(MakerSetup.FLASH_LOAN_CONTRACT),
+                token: Constants.DAI
+            })
+        );
     }
 }
