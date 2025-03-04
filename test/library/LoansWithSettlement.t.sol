@@ -123,6 +123,12 @@ contract LoansWithSettlementTest is Test {
         assertEq(expectedLoan, loan);
     }
 
+    function testFuzz_revertsOnPoppingWithNoLoans(bytes memory settlement) external {
+        Loan.Data[] memory loans = new Loan.Data[](0);
+        vm.expectRevert("No loans available");
+        loanWithSettlementEncoder.encodeAndPopLoan(loans, settlement);
+    }
+
     function testFuzz_encodedDataEncodesSettlement(Loan.Data[] memory loans, bytes memory expectedSettlement)
         external
         view
