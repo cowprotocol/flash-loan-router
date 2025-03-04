@@ -65,14 +65,18 @@ library LoansWithSettlement {
         pure
         returns (uint256 amount, IBorrower borrower, address lender, IERC20 token)
     {
+        uint256 length = loanCount(loansWithSettlement);
+        require(length > 0, "No loans available");
         // Note that loans are encoded in reverse order, meaning that the next
         // loan to process is the last of the encoded array.
-        uint256 reducedLength = loanCount(loansWithSettlement) - 1;
+        unchecked {
+            length = loanCount(loansWithSettlement) - 1;
+        }
         Loan.Data[] memory loans = loansWithSettlement.loans;
-        amount = loans[reducedLength].amount;
-        borrower = loans[reducedLength].borrower;
-        lender = loans[reducedLength].lender;
-        token = loans[reducedLength].token;
+        amount = loans[length].amount;
+        borrower = loans[length].borrower;
+        lender = loans[length].lender;
+        token = loans[length].token;
 
         // Efficiently reduce the size of the loans array.
         assembly ("memory-safe") {
@@ -81,7 +85,7 @@ library LoansWithSettlement {
             //  Memory is never freed, so the remaining unused memory won't
             // affect the compiler.
             // <https://docs.soliditylang.org/en/v0.8.28/internals/layout_in_memory.html>
-            mstore(loans, reducedLength)
+            mstore(loans, length)
         }
     }
 }
