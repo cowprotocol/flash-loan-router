@@ -30,7 +30,7 @@ interface IBorrower {
     function flashLoanAndCallBack(address lender, IERC20 token, uint256 amount, bytes calldata callBackData) external;
 
     /// @notice Approves the target address to spend the specified token on
-    /// behalf of the flash-loan solver wrapper up to the specified amount.
+    /// behalf of the Borrower up to the specified amount.
     /// @dev In general, the only way to transfer funds out of this contract is
     /// through a call to this function and a subsequent call to `transferFrom`.
     /// This approval is expected to work similarly to an ERC-20 approval (in
