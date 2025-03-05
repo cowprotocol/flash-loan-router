@@ -44,3 +44,5 @@ jobs:
         run: |
           forge test -vvv
         id: test
+        env:
+          MAINNET_ARCHIVE_NODE_URL: "${{secrets.MAINNET_ARCHIVE_NODE_URL}}"
