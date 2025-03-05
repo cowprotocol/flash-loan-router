@@ -16,7 +16,7 @@ import {IERC20} from "../vendored/IERC20.sol";
 /// contract that imports this.
 /// It handles fund management through ERC-20 approvals, call authentication,
 /// and router interactions.
-abstract contract GenericBorrower is IBorrower {
+abstract contract Borrower is IBorrower {
     using SafeApprove for IERC20;
 
     /// @inheritdoc IBorrower

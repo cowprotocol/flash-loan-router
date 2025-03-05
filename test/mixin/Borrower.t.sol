@@ -3,12 +3,12 @@ pragma solidity ^0.8;
 
 import {Test} from "forge-std/Test.sol";
 
-import {GenericBorrower, ICowSettlement, IERC20, IFlashLoanRouter} from "src/mixin/GenericBorrower.sol";
+import {Borrower, ICowSettlement, IERC20, IFlashLoanRouter} from "src/mixin/Borrower.sol";
 
-contract GenericBorrowerImplementation is GenericBorrower {
+contract BorrowerImplementation is Borrower {
     event FlashLoanTriggered(address, IERC20, uint256, bytes);
 
-    constructor(IFlashLoanRouter _router) GenericBorrower(_router) {}
+    constructor(IFlashLoanRouter _router) Borrower(_router) {}
 
     function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory callBackData)
         internal
@@ -22,18 +22,18 @@ contract GenericBorrowerImplementation is GenericBorrower {
     }
 }
 
-contract GenericBorrowerTest is Test {
+contract BorrowerTest is Test {
     IFlashLoanRouter private router;
     ICowSettlement private settlementContract;
-    GenericBorrowerImplementation private borrower;
+    BorrowerImplementation private borrower;
 
     function setUp() external {
-        router = IFlashLoanRouter(makeAddr("GenericBorrowerTest: router"));
-        settlementContract = ICowSettlement(makeAddr("GenericBorrowerTest: settlementContract"));
+        router = IFlashLoanRouter(makeAddr("BorrowerTest: router"));
+        settlementContract = ICowSettlement(makeAddr("BorrowerTest: settlementContract"));
         vm.mockCall(
             address(router), abi.encodeCall(IFlashLoanRouter.settlementContract, ()), abi.encode(settlementContract)
         );
-        borrower = new GenericBorrowerImplementation(router);
+        borrower = new BorrowerImplementation(router);
     }
 
     function test_constructor_parameters() external view {
@@ -53,7 +53,7 @@ contract GenericBorrowerTest is Test {
         uint256 amount = 42;
         bytes memory callBackData = hex"313337";
         vm.expectEmit(address(borrower));
-        emit GenericBorrowerImplementation.FlashLoanTriggered(lender, token, amount, callBackData);
+        emit BorrowerImplementation.FlashLoanTriggered(lender, token, amount, callBackData);
         vm.prank(address(router));
         borrower.flashLoanAndCallBack(lender, token, amount, callBackData);
     }
