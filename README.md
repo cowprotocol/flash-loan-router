@@ -16,6 +16,12 @@ $ forge build
 $ forge test
 ```
 
+To exclude tests requiring an internet connection:
+
+```shell
+$ forge test --no-match-path 'test/e2e/**/*'
+```
+
 ### Format
 
 ```shell
