@@ -3,7 +3,7 @@ pragma solidity ^0.8;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Borrower, ICowSettlement, IERC20, IFlashLoanRouter} from "src/mixin/Borrower.sol";
+import {Borrower, ICowSettlement, IERC20, IFlashLoanRouter, SafeERC20} from "src/mixin/Borrower.sol";
 
 contract BorrowerImplementation is Borrower {
     event FlashLoanTriggered(address, IERC20, uint256, bytes);
@@ -107,7 +107,7 @@ contract BorrowerTest is Test {
         bytes memory approveCallData = abi.encodeCall(IERC20.approve, (target, amount));
         vm.mockCall(address(token), approveCallData, abi.encode(false));
         vm.prank(address(settlementContract));
-        vm.expectRevert("SafeApprove: operation failed");
+        vm.expectRevert(abi.encodeWithSelector(SafeERC20.SafeERC20FailedOperation.selector, (token)));
         borrower.approve(token, target, amount);
     }
 

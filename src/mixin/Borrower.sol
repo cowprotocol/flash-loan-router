@@ -4,10 +4,9 @@ pragma solidity ^0.8;
 import {IBorrower} from "../interface/IBorrower.sol";
 import {ICowSettlement} from "../interface/ICowSettlement.sol";
 import {IFlashLoanRouter} from "../interface/IFlashLoanRouter.sol";
-
-import {SafeApprove} from "../library/SafeApprove.sol";
 import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
 import {IERC20} from "../vendored/IERC20.sol";
+import {SafeERC20} from "../vendored/SafeERC20.sol";
 
 /// @title Generic Borrower
 /// @author CoW DAO developers
@@ -17,7 +16,7 @@ import {IERC20} from "../vendored/IERC20.sol";
 /// It handles fund management through ERC-20 approvals, call authentication,
 /// and router interactions.
 abstract contract Borrower is IBorrower {
-    using SafeApprove for IERC20;
+    using SafeERC20 for IERC20;
 
     /// @inheritdoc IBorrower
     IFlashLoanRouter public immutable router;
@@ -54,7 +53,7 @@ abstract contract Borrower is IBorrower {
 
     /// @inheritdoc IBorrower
     function approve(IERC20 token, address target, uint256 amount) external onlySettlementContract {
-        token.safeApprove(target, amount);
+        token.forceApprove(target, amount);
     }
 
     /// @notice Every flash-loan provider has different syntax for requesting a
