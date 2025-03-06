@@ -15,7 +15,7 @@ import {IERC20} from "./vendored/IERC20.sol";
 /// executing a settlement. Every CoW Protocol solver can call this
 /// contract to borrow the funds needed for executing a settlement.
 contract FlashLoanRouter is IFlashLoanRouter {
-    using LoansWithSettlement for LoansWithSettlement.Data;
+    using LoansWithSettlement for bytes;
 
     /// @notice Flag address signalling that the router is not currently
     /// preparing or executing a settlement. This is the case at the start or
@@ -68,7 +68,7 @@ contract FlashLoanRouter is IFlashLoanRouter {
     /// way for this contract to call itself at `flashLoanAndSettle`.
     function flashLoanAndSettle(Loan.Data[] calldata loans, bytes calldata settlement) external onlySolver {
         require(pendingBorrower == READY, "Another settlement in progress");
-        LoansWithSettlement.Data memory loansWithSettlement = LoansWithSettlement.encode(loans, settlement);
+        bytes memory loansWithSettlement = LoansWithSettlement.encode(loans, settlement);
         borrowNextLoan(loansWithSettlement);
         // The following parameter is expected to be set before the final call
         // to `settle()` is executed. This flag being set means that no more
@@ -82,9 +82,7 @@ contract FlashLoanRouter is IFlashLoanRouter {
     /// @inheritdoc IFlashLoanRouter
     /// @dev Note that the contract cannot call itself as a borrower because it
     /// doesnt implement the expected interface.
-    function borrowerCallBack(bytes memory encodedLoansWithSettlement) external onlyPendingBorrower {
-        LoansWithSettlement.Data memory loansWithSettlement =
-            abi.decode(encodedLoansWithSettlement, (LoansWithSettlement.Data));
+    function borrowerCallBack(bytes memory loansWithSettlement) external onlyPendingBorrower {
         // When the borrower is called, it's given some extra data that is
         // expected to be passed back here without changes.
         require(loansWithSettlement.hash() == pendingDataHash, "Data from borrower not matching");
@@ -94,17 +92,17 @@ contract FlashLoanRouter is IFlashLoanRouter {
     /// @notice Takes the input loans with settlements; if none is available, it
     /// calls settle; otherwise, it requests the next loan from the borrower.
     /// @param loansWithSettlement List of loans with settlement to process.
-    function borrowNextLoan(LoansWithSettlement.Data memory loansWithSettlement) private {
+    function borrowNextLoan(bytes memory loansWithSettlement) private {
         if (loansWithSettlement.loanCount() == 0) {
             // We set the borrower to some value different from `READY` or any
             // intermediate borrower address to prevent reentrancy.
             pendingBorrower = SETTLING;
-            settle(loansWithSettlement.settlement);
+            settle(loansWithSettlement.destroyAndExtractSettlement());
         } else {
             (uint256 amount, IBorrower borrower, address lender, IERC20 token) = loansWithSettlement.popLoan();
             pendingBorrower = borrower;
             pendingDataHash = loansWithSettlement.hash();
-            borrower.flashLoanAndCallBack(lender, token, amount, abi.encode(loansWithSettlement));
+            borrower.flashLoanAndCallBack(lender, token, amount, loansWithSettlement);
         }
     }
 

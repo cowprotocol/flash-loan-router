@@ -39,7 +39,7 @@ contract FlashLoanRouterExposed is FlashLoanRouter {
     function encodeLoansWithSettlement(Loan.Data[] calldata loans, bytes calldata settlement)
         external
         pure
-        returns (LoansWithSettlement.Data memory)
+        returns (bytes memory)
     {
         return LoansWithSettlement.encode(loans, settlement);
     }
@@ -61,7 +61,7 @@ contract FlashLoanRouterCaller {
 }
 
 contract FlashLoanRouterTest is Test {
-    using LoansWithSettlement for LoansWithSettlement.Data;
+    using LoansWithSettlement for bytes;
 
     FlashLoanRouterExposed router;
     FlashLoanRouterCaller caller;
