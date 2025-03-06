@@ -20,19 +20,16 @@ library AaveSetup {
     // https://app.aave.com/reserve-overview/?underlyingAsset=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&marketName=proto_mainnet_v3
     IAavePool internal constant WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
 
-    function prepareSolverWrapper(Vm vm, FlashLoanRouter router, address solver)
-        internal
-        returns (AaveBorrower solverWrapper)
-    {
-        solverWrapper = new AaveBorrower(router);
+    function prepareBorrower(Vm vm, FlashLoanRouter router, address solver) internal returns (AaveBorrower borrower) {
+        borrower = new AaveBorrower(router);
 
         // Call `approve` from the settlement contract so that WETH can be spent
-        // on a settlement interaction on behalf of the solver wrapper. With an
+        // on a settlement interaction on behalf of the borrower. With an
         // unlimited approval, this step only needs to be performed once per
         // loaned token.
         ICowSettlement.Interaction[] memory onlyApprove = new ICowSettlement.Interaction[](1);
-        onlyApprove[0] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
+        onlyApprove[0] = CowProtocolInteraction.borrowerApprove(
+            borrower, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
         );
         vm.prank(solver);
         CowProtocol.emptySettleWithInteractions(onlyApprove);
@@ -52,7 +49,7 @@ contract E2eAave is Test {
     uint256 private constant MAINNET_FORK_BLOCK = 21883877;
     address private solver = makeAddr("E2eAaveV2: solver");
 
-    AaveBorrower private solverWrapper;
+    AaveBorrower private borrower;
     TokenBalanceAccumulator private tokenBalanceAccumulator;
     FlashLoanRouter private router;
 
@@ -62,7 +59,7 @@ contract E2eAave is Test {
         router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
         CowProtocol.addSolver(vm, solver);
         CowProtocol.addSolver(vm, address(router));
-        solverWrapper = AaveSetup.prepareSolverWrapper(vm, router, solver);
+        borrower = AaveSetup.prepareBorrower(vm, router, solver);
     }
 
     function test_settleWithFlashLoan() external {
@@ -85,11 +82,10 @@ contract E2eAave is Test {
         // Start preparing the settlement interactions.
         ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](6);
         // First, we confirm that, at the point in time of the settlement, the
-        // flash loan proceeds are indeed stored in the wrapper solver.
-        interactionsWithFlashLoan[0] = CowProtocolInteraction.pushBalanceToAccumulator(
-            tokenBalanceAccumulator, Constants.WETH, address(solverWrapper)
-        );
-        expectedBalances[0] = TokenBalanceAccumulator.Balance(Constants.WETH, address(solverWrapper), loanedAmount);
+        // flash loan proceeds are indeed stored in the borrower.
+        interactionsWithFlashLoan[0] =
+            CowProtocolInteraction.pushBalanceToAccumulator(tokenBalanceAccumulator, Constants.WETH, address(borrower));
+        expectedBalances[0] = TokenBalanceAccumulator.Balance(Constants.WETH, address(borrower), loanedAmount);
         // Second, we double check that the settlement balance hasn't changed.
         interactionsWithFlashLoan[1] = CowProtocolInteraction.pushBalanceToAccumulator(
             tokenBalanceAccumulator, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT)
@@ -99,12 +95,12 @@ contract E2eAave is Test {
         );
         // Third, we make sure we can transfer these tokens. We do that by
         // trying a transfer into the settlement contract. The expectation is
-        // that the wrapper has already approved the settlement contract to
+        // that the borrower has already approved the settlement contract to
         // transfer its tokens out of it. In practice, the target of the
         // transfer is expected to be the user rather than the settlement
         // contract for gas efficiency.
         interactionsWithFlashLoan[2] = CowProtocolInteraction.transferFrom(
-            Constants.WETH, address(solverWrapper), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
+            Constants.WETH, address(borrower), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
         );
         // Fourth, we check that the balance has indeed changed.
         interactionsWithFlashLoan[3] = CowProtocolInteraction.pushBalanceToAccumulator(
@@ -117,20 +113,20 @@ contract E2eAave is Test {
         // loan by calling `transferFrom` under the assumption that the flash
         // loan borrower holds the funds plus the expected fee and has approved
         // its contract for withdrawing this amount.
-        interactionsWithFlashLoan[4] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.WETH, address(AaveSetup.WETH_POOL), loanedAmount + absoluteFlashFee
+        interactionsWithFlashLoan[4] = CowProtocolInteraction.borrowerApprove(
+            borrower, Constants.WETH, address(AaveSetup.WETH_POOL), loanedAmount + absoluteFlashFee
         );
-        // Sixth and finally, send the funds to the solver wrapper for repayment
-        // of the loan.
+        // Sixth and finally, send the funds to the borrower for repayment of
+        // the loan.
         interactionsWithFlashLoan[5] =
-            CowProtocolInteraction.transfer(Constants.WETH, address(solverWrapper), loanedAmount + absoluteFlashFee);
+            CowProtocolInteraction.transfer(Constants.WETH, address(borrower), loanedAmount + absoluteFlashFee);
 
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
         Loan.Data[] memory loans = new Loan.Data[](1);
         loans[0] = Loan.Data({
             amount: loanedAmount,
-            borrower: solverWrapper,
+            borrower: borrower,
             lender: address(AaveSetup.WETH_POOL),
             token: Constants.WETH
         });
