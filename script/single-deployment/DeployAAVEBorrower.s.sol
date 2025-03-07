@@ -12,14 +12,11 @@ contract DeployAAVEBorrower is Script, EnvReader {
     }
 
     function deployAAVEBorrower() internal returns (AaveBorrower borrower) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        require(deployerPrivateKey != 0, "Missing or invalid PRIVATE_KEY.");
-
         // Ensure the router address is provided
         address routerAddress = addressEnvOrDefault("FLASHLOAN_ROUTER_ADDRESS", flashLoanRouter);
         require(routerAddress != address(0), "Missing or invalid FLASHLOAN_ROUTER_ADDRESS.");
 
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // Deploy borrower using existing router
         FlashLoanRouter router = FlashLoanRouter(routerAddress);

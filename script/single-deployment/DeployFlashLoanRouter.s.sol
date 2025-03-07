@@ -12,10 +12,7 @@ contract DeployFlashLoanRouter is Script, EnvReader {
     }
 
     function deployFlashLoanRouter() internal returns (FlashLoanRouter router) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        require(deployerPrivateKey != 0, "Missing or invalid PRIVATE_KEY.");
-
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // Deploy FlashLoanRouter
         ICowSettlement cowSettlement = ICowSettlement(DEFAULT_SETTLEMENT_CONTRACT);
