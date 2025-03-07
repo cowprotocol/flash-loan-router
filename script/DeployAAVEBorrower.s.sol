@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {AaveBorrower} from "../src/AaveBorrower.sol";
 import {FlashLoanRouter} from "../src/FlashLoanRouter.sol";
 import {ICowSettlement} from "../src/interface/ICowSettlement.sol";
-import "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {EnvReader} from "script/libraries/EnvReader.sol";
 import {Utils} from "script/libraries/Utils.sol";
 
