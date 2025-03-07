@@ -19,9 +19,6 @@ contract DeployFlashLoanRouter is Script, EnvReader {
         router = new FlashLoanRouter{salt: SALT}(cowSettlement);
         console.log("FlashLoanRouter deployed at:", address(router));
 
-        // Update flashLoanRouter for borrower deployments
-        flashLoanRouter = address(router);
-
         vm.stopBroadcast();
         return router;
     }
