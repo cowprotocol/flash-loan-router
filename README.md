@@ -34,7 +34,7 @@ The deployment [scripts](script) permit the deployment of a single contract or a
 
 #### Deploy a Single Contract
 
-The deploy a single contract, e.g., `FlashLoanRouter.sol` we can use the command below.
+The deploy a single contract, the scripts within the [script/single-deployment](script/single-deployment) directory are used, e.g., to deploy the `FlashLoanRouter.sol` contract, the command below is used:
 
 ```shell
 $ forge script script/single-deployment/DeployFlashLoanRouter.s.sol:DeployFlashLoanRouter --rpc-url <your_rpc_url> --private-key <your_private_key>
