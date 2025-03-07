@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.28;
 
+import {Script, console} from "forge-std/Script.sol";
+
 import {AaveBorrower} from "../../src/AaveBorrower.sol";
 import {FlashLoanRouter} from "../../src/FlashLoanRouter.sol";
-import {Script, console} from "forge-std/Script.sol";
+
 import {EnvReader} from "script/libraries/EnvReader.sol";
 
 contract DeployAAVEBorrower is Script, EnvReader {
