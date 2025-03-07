@@ -17,19 +17,19 @@ library MakerSetup {
     IERC3156FlashLender internal constant FLASH_LOAN_CONTRACT =
         IERC3156FlashLender(0x60744434d6339a6B27d73d9Eda62b6F66a0a04FA);
 
-    function prepareSolverWrapper(Vm vm, FlashLoanRouter router, address solver)
+    function prepareBorrower(Vm vm, FlashLoanRouter router, address solver)
         internal
-        returns (ERC3156Borrower solverWrapper)
+        returns (ERC3156Borrower borrower)
     {
-        solverWrapper = new ERC3156Borrower(router);
+        borrower = new ERC3156Borrower(router);
 
         // Call `approve` from the settlement contract so that DAI can be spent
-        // on a settlement interaction on behalf of the solver wrapper. With an
+        // on a settlement interaction on behalf of the borrower. With an
         // unlimited approval, this step only needs to be performed once per
         // loaned token.
         ICowSettlement.Interaction[] memory onlyApprove = new ICowSettlement.Interaction[](1);
-        onlyApprove[0] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.DAI, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
+        onlyApprove[0] = CowProtocolInteraction.borrowerApprove(
+            borrower, Constants.DAI, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
         );
         vm.prank(solver);
         CowProtocol.emptySettleWithInteractions(onlyApprove);
@@ -45,7 +45,7 @@ contract E2eMaker is Test {
     uint256 private constant MAINNET_FORK_BLOCK = 21765553;
     address private solver = makeAddr("E2eMaker: solver");
 
-    ERC3156Borrower private solverWrapper;
+    ERC3156Borrower private borrower;
     TokenBalanceAccumulator private tokenBalanceAccumulator;
     FlashLoanRouter private router;
 
@@ -59,7 +59,7 @@ contract E2eMaker is Test {
         vm.prank(Constants.AUTHENTICATOR_MANAGER);
         Constants.SOLVER_AUTHENTICATOR.addSolver(address(router));
 
-        solverWrapper = MakerSetup.prepareSolverWrapper(vm, router, solver);
+        borrower = MakerSetup.prepareBorrower(vm, router, solver);
     }
 
     function test_settleWithFlashLoan() external {
@@ -77,11 +77,10 @@ contract E2eMaker is Test {
         // Start preparing the settlement interactions.
         ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](6);
         // First, we confirm that, at the point in time of the settlement, the
-        // flash loan proceeds are indeed stored in the wrapper solver.
-        interactionsWithFlashLoan[0] = CowProtocolInteraction.pushBalanceToAccumulator(
-            tokenBalanceAccumulator, Constants.DAI, address(solverWrapper)
-        );
-        expectedBalances[0] = TokenBalanceAccumulator.Balance(Constants.DAI, address(solverWrapper), loanedAmount);
+        // flash loan proceeds are indeed stored in the borrower.
+        interactionsWithFlashLoan[0] =
+            CowProtocolInteraction.pushBalanceToAccumulator(tokenBalanceAccumulator, Constants.DAI, address(borrower));
+        expectedBalances[0] = TokenBalanceAccumulator.Balance(Constants.DAI, address(borrower), loanedAmount);
         // Second, we double check that the settlement balance hasn't changed.
         interactionsWithFlashLoan[1] = CowProtocolInteraction.pushBalanceToAccumulator(
             tokenBalanceAccumulator, Constants.DAI, address(Constants.SETTLEMENT_CONTRACT)
@@ -91,12 +90,12 @@ contract E2eMaker is Test {
         );
         // Third, we make sure we can transfer these tokens. We do that by
         // trying a transfer into the settlement contract. The expectation is
-        // that the wrapper has already approved the settlement contract to
+        // that the borrower has already approved the settlement contract to
         // transfer its tokens out of it. In practice, the target of the
         // transfer is expected to be the user rather than the settlement
         // contract for gas efficiency.
         interactionsWithFlashLoan[2] = CowProtocolInteraction.transferFrom(
-            Constants.DAI, address(solverWrapper), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
+            Constants.DAI, address(borrower), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
         );
         // Fourth, we check that the balance has indeed changed.
         interactionsWithFlashLoan[3] = CowProtocolInteraction.pushBalanceToAccumulator(
@@ -109,20 +108,19 @@ contract E2eMaker is Test {
         // loan by calling `transferFrom` under the assumption that the flash
         // loan borrower holds the funds and has approved its contract for
         // withdrawing funds.
-        interactionsWithFlashLoan[4] = CowProtocolInteraction.wrapperApprove(
-            solverWrapper, Constants.DAI, address(MakerSetup.FLASH_LOAN_CONTRACT), loanedAmount
+        interactionsWithFlashLoan[4] = CowProtocolInteraction.borrowerApprove(
+            borrower, Constants.DAI, address(MakerSetup.FLASH_LOAN_CONTRACT), loanedAmount
         );
-        // Sixth and finally, send the funds to the solver wrapper for repayment
-        // of the loan.
-        interactionsWithFlashLoan[5] =
-            CowProtocolInteraction.transfer(Constants.DAI, address(solverWrapper), loanedAmount);
+        // Sixth and finally, send the funds to the borrower for repayment of
+        // the loan.
+        interactionsWithFlashLoan[5] = CowProtocolInteraction.transfer(Constants.DAI, address(borrower), loanedAmount);
 
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
         Loan.Data[] memory loans = new Loan.Data[](1);
         loans[0] = Loan.Data({
             amount: loanedAmount,
-            borrower: solverWrapper,
+            borrower: borrower,
             lender: address(MakerSetup.FLASH_LOAN_CONTRACT),
             token: Constants.DAI
         });

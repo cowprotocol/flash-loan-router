@@ -32,13 +32,13 @@ library CowProtocolInteraction {
         });
     }
 
-    function wrapperApprove(IBorrower solverWrapper, IERC20 token, address spender, uint256 amount)
+    function borrowerApprove(IBorrower borrower, IERC20 token, address spender, uint256 amount)
         internal
         pure
         returns (ICowSettlement.Interaction memory)
     {
         return ICowSettlement.Interaction({
-            target: address(solverWrapper),
+            target: address(borrower),
             value: 0,
             callData: abi.encodeCall(IBorrower.approve, (token, spender, amount))
         });
