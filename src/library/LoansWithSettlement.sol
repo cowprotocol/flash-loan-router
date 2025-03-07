@@ -155,8 +155,8 @@ library LoansWithSettlement {
         return encodedLoan.decode();
     }
 
-    /// @notice Takes the input value, destroys its content in memory, and
-    /// extracts the settlement stored as part of its encoding.
+    /// @notice Takes an input value with no encoded loans, destroys its content
+    /// in memory, and extracts the settlement stored as part of its encoding.
     /// @dev This function overwrites the low-level memory representation of
     /// the input value, meaning that trying to use the input after calling
     /// this function leads to broken code. This functon takes full ownership
@@ -165,11 +165,8 @@ library LoansWithSettlement {
     /// settlement. It must have valid encoding. This value will be destroyed
     /// by calling this function and must not be used anywhere else.
     /// @return settlement The settlement encoded in the input.
-    function destroyAndExtractSettlement(bytes memory loansWithSettlement)
-        internal
-        pure
-        returns (bytes memory settlement)
-    {
+    function destroyToSettlement(bytes memory loansWithSettlement) internal pure returns (bytes memory settlement) {
+        require(loanCount(loansWithSettlement) == 0, "Pending loans");
         // We assume that the input is loans with a settlement, encoded as
         // expected by this library. The settlement data is a subarray of the
         // input: if we accept to override the input data with arbitrary data,
@@ -178,10 +175,10 @@ library LoansWithSettlement {
         uint256 settlementLength;
         unchecked {
             // Unchecked: we assume `loansWithSettlement` to be valid encoded
-            // loans with settlement. By construction, it should be long enough
-            // to store the encoding of the encoded loans and the loan count.
-            settlementLength = loansWithSettlement.length - LOAN_COUNT_SIZE
-                - loanCount(loansWithSettlement) * Loan.ENCODED_LOAN_BYTE_SIZE;
+            // loans with settlement. Since there are no loans, this means that
+            // it comprises the loan count plus the settlement data, which is at
+            // least zero.
+            settlementLength = loansWithSettlement.length - LOAN_COUNT_SIZE;
         }
 
         // We rely on the fact that LOAN_COUNT_SIZE is 32, exactly the size
