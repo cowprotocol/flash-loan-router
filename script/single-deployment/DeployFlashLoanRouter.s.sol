@@ -17,10 +17,12 @@ contract DeployFlashLoanRouter is Script, EnvReader {
 
         vm.startBroadcast(deployerPrivateKey);
 
+        // Deploy FlashLoanRouter
         ICowSettlement cowSettlement = ICowSettlement(DEFAULT_SETTLEMENT_CONTRACT);
         router = new FlashLoanRouter{salt: SALT}(cowSettlement);
         console.log("FlashLoanRouter deployed at:", address(router));
 
+        // Update flashLoanRouter for Borrower deployments
         flashLoanRouter = address(router);
 
         vm.stopBroadcast();
