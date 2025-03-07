@@ -18,7 +18,7 @@ contract DeployAAVEBorrower is Script, EnvReader {
 
         vm.startBroadcast();
 
-        // Deploy borrower using existing router
+        // Deploy AaveBorrower using existing router
         FlashLoanRouter router = FlashLoanRouter(routerAddress);
         borrower = new AaveBorrower{salt: SALT}(router);
         console.log("AaveBorrower deployed at:", address(borrower));
