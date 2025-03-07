@@ -1,4 +1,4 @@
-## Flash-Loan Wrapper Solver
+## Flash-Loan Router
 
 A smart contract that allows CoW Protocol solvers to call `settle` in the context of a flash-loan contract.
 
