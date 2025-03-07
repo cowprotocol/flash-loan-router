@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.28;
 
-import {Script, console} from "forge-std/Script.sol";
 import {FlashLoanRouter} from "../../src/FlashLoanRouter.sol";
 import {ICowSettlement} from "../../src/interface/ICowSettlement.sol";
 import {EnvReader} from "../libraries/EnvReader.sol";
+import {Script, console} from "forge-std/Script.sol";
 
 contract DeployFlashLoanRouter is Script, EnvReader {
     function run() public virtual {
