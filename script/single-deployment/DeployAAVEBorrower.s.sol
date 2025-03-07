@@ -6,9 +6,9 @@ import {Script, console} from "forge-std/Script.sol";
 import {AaveBorrower} from "../../src/AaveBorrower.sol";
 import {FlashLoanRouter} from "../../src/FlashLoanRouter.sol";
 
-import {EnvReader} from "script/libraries/EnvReader.sol";
+import {Constants} from "script/libraries/Constants.sol";
 
-contract DeployAAVEBorrower is Script, EnvReader {
+contract DeployAAVEBorrower is Script {
     function run() public virtual {
         deployAAVEBorrower(FlashLoanRouter(address(0)));
     }
@@ -29,7 +29,7 @@ contract DeployAAVEBorrower is Script, EnvReader {
         // Use the router (either provided or from env variable)
         FlashLoanRouter flashLoanRouter = FlashLoanRouter(routerAddress);
         
-        borrower = new AaveBorrower{salt: SALT}(flashLoanRouter);
+        borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
         console.log("AaveBorrower deployed at:", address(borrower));
 
         vm.stopBroadcast();
