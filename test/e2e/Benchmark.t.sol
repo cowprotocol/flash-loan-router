@@ -3,8 +3,6 @@ pragma solidity ^0.8;
 
 import {Test, Vm} from "forge-std/Test.sol";
 
-import {AaveBorrower, IAavePool} from "src/AaveBorrower.sol";
-import {ERC3156Borrower, IERC3156FlashLender} from "src/ERC3156Borrower.sol";
 import {FlashLoanRouter, Loan} from "src/FlashLoanRouter.sol";
 import {IBorrower, ICowSettlement, IERC20} from "src/interface/IBorrower.sol";
 
@@ -14,7 +12,6 @@ import {Constants} from "./lib/Constants.sol";
 import {CowProtocol} from "./lib/CowProtocol.sol";
 import {CowProtocolInteraction} from "./lib/CowProtocolInteraction.sol";
 import {ForkedRpc} from "./lib/ForkedRpc.sol";
-import {TokenBalanceAccumulator} from "./lib/TokenBalanceAccumulator.sol";
 
 uint256 constant MAINNET_FORK_BLOCK = 21765553;
 
