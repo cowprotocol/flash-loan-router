@@ -22,8 +22,6 @@ contract DeployAAVEBorrower is Script, EnvReader {
             routerAddress = vm.envAddress("FLASHLOAN_ROUTER_ADDRESS");
         }
         
-        require(routerAddress != address(0), "Missing or invalid FLASHLOAN_ROUTER_ADDRESS.");
-
         vm.startBroadcast();
 
         // Use the router (either provided or from env variable)
