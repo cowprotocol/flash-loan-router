@@ -43,12 +43,12 @@ contract BytesTest is Test {
         assertEq(allocator.allocate(length).length, length);
     }
 
-    function testFuzz_allocatedArray(uint24 length) external view {
+    function testFuzz_allocatedArrayHasExpectedLengthDespiteDirtyMemory(uint24 length) external view {
         // This is exactly the maximum length before allocating reverts with
         // `MemoryOOG` error.
         uint256 maxAllocationBeforeMemoryOOGError = 8366830;
         vm.assume(length <= maxAllocationBeforeMemoryOOGError);
-        assertEq(allocator.allocate(length).length, length);
+        assertEq(allocator.allocateWithDirtyMemory(length).length, length);
     }
 
     function test_pointsToMemoryContent() external pure {
