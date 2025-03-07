@@ -14,7 +14,5 @@ contract DeployAllContracts is DeployFlashLoanRouter, DeployAAVEBorrower {
     function deployAll() public returns (FlashLoanRouter flashLoanRouter, AaveBorrower aaveBorrower) {
         flashLoanRouter = deployFlashLoanRouter();
         aaveBorrower = deployAAVEBorrower();
-
-        vm.stopBroadcast();
     }
 }
