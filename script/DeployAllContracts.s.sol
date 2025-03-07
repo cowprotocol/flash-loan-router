@@ -6,8 +6,6 @@ import {Script, console} from "forge-std/Script.sol";
 import {AaveBorrower, DeployAAVEBorrower} from "./single-deployment/DeployAAVEBorrower.s.sol";
 import {DeployFlashLoanRouter, FlashLoanRouter} from "./single-deployment/DeployFlashLoanRouter.s.sol";
 
-import {EnvReader} from "./libraries/EnvReader.sol";
-
 contract DeployAllContracts is DeployFlashLoanRouter, DeployAAVEBorrower {
     function run() public override(DeployFlashLoanRouter, DeployAAVEBorrower) {
         deployAll();
