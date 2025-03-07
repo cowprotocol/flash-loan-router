@@ -42,7 +42,7 @@ $ forge script script/single-deployment/DeployFlashLoanRouter.s.sol:DeployFlashL
 
 #### Deploy All Contracts
 
-To deploy all contracts, we can use the command below. This will run the deployments for FlashLoanRouter and Borrower contracts specified in the [DeployAllContracts](script/DeployAllContracts.s.sol) script.
+To deploy all contracts, the [DeployAllContracts](script/DeployAllContracts.s.sol) script is used. This will run the deployments for FlashLoanRouter and Borrower contracts specified in the script.
 
 ```shell
 $ forge script script/DeployAllContracts.s.sol:DeployAllContracts --rpc-url <your_rpc_url> --private-key <your_private_key>
