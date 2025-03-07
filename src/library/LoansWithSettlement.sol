@@ -48,7 +48,7 @@ library LoansWithSettlement {
     /// @param loansWithSettlement The list of loans with settlement to hash.
     /// @return A collision-resistent identifier for the input.
     function hash(bytes memory loansWithSettlement) internal pure returns (bytes32) {
-        return keccak256(abi.encode(loansWithSettlement));
+        return keccak256(loansWithSettlement);
     }
 
     /// @notice Store the list of loans and the settlement in a format
