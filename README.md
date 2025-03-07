@@ -34,10 +34,10 @@ The deployment [scripts](script) permit the deployment of a single contract or a
 
 #### Deploy a Single Contract
 
-The deploy a single contract, e.g., `FlashLoanRouter.sol` we can use the following command:
+The deploy a single contract, e.g., `FlashLoanRouter.sol` we can use the command below.
 
 ```shell
-$ forge script script/DeployFlashLoanRouter.s.sol:DeployFlashLoanRouter --rpc-url <your_rpc_url> --private-key <your_private_key>
+$ forge script script/single-deployment/DeployFlashLoanRouter.s.sol:DeployFlashLoanRouter --rpc-url <your_rpc_url> --private-key <your_private_key>
 ```
 
 #### Deploy All Contracts
