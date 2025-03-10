@@ -56,7 +56,7 @@ All calls are terminated at the end, after the settlement is executed.
 
 ```mermaid
 sequenceDiagram
-  CoW-Protocol Solver ->> flash-loan router: flashLoanAndSettle()
+  CoW-Protocol solver ->> flash-loan router: flashLoanAndSettle()
   flash-loan router ->> Aave borrower: flashLoanAndCallBack()
   Aave borrower ->> Aave lender contract: Aave-specific flash loan request
   Aave lender contract ->> Aave borrower: Aave-specific flash loan callback
