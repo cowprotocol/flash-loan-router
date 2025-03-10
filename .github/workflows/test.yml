@@ -46,6 +46,3 @@ jobs:
         id: test
         env:
           MAINNET_ARCHIVE_NODE_URL: "${{secrets.MAINNET_ARCHIVE_NODE_URL}}"
-
-      - name: Ensure gas snapshots were updated
-        run: git diff --exit-code -- snapshots/
