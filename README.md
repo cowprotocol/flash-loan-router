@@ -42,6 +42,9 @@ We support the following flash-loan lenders:
 
 Support for further flash-loan lenders can be added in the future.
 
+This repository provides an abstract `Borrower` implementation that encodes much of the logic expected from a borrower.
+Concrete borrower implementations can be built by inheriting this contract and implementing two functions: `triggerFlashLoan`, which describes how to call the lender to request a flash loan, and the lender-specific call-back function that internallly forwards the call to `Borrower.flashLoanCallBack`.
+
 ### Example: a settlement with two loans, Aave and Maker
 
 We describe an example of how to execute a settlement after borrowing two flash loans (from Aave and Maker) through the flash-loan router.
