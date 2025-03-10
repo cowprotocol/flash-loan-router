@@ -17,11 +17,14 @@ contract DeployFlashLoanRouter is Script {
         vm.startBroadcast();
 
         // Deploy FlashLoanRouter
+        router = newFlashLoanRouter();
+
+        vm.stopBroadcast();
+    }
+
+    function newFlashLoanRouter() internal returns (FlashLoanRouter router) {
         ICowSettlement cowSettlement = ICowSettlement(Constants.DEFAULT_SETTLEMENT_CONTRACT);
         router = new FlashLoanRouter{salt: Constants.SALT}(cowSettlement);
         console.log("FlashLoanRouter deployed at:", address(router));
-
-        vm.stopBroadcast();
-        return router;
     }
 }
