@@ -16,7 +16,9 @@ It takes a list of loans with the following entries for each loan:
 - The _borrower_, which is an adapter contract that makes the specific lender implementation compatible with the router.
 
 It also takes the exact call data for a call to `settle`.
-The flash-loan router is a solver for CoW Protocol and calls `settle` directly once the flash loans have been obtained.  
+The flash-loan router is a solver for CoW Protocol and calls `settle` directly once the flash loans have been obtained.
+Only CoW-Protocol solvers can call this function.
+Solver authentication is done by interrogating the same contract that manages solver authentication for the settlement contract.
 
 Tokens and lenders are external contracts, while the router and each specific borrowers are dedicated contract implemented in this repository.
 
