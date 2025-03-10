@@ -44,7 +44,7 @@ contract LoanWithSettlementEncoder {
         returns (bytes memory)
     {
         bytes memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
-        return encodedLoansWithSettlement.destroyAndExtractSettlement();
+        return encodedLoansWithSettlement.destroyToSettlement();
     }
 
     function encodePopLoanAndHash(Loan.Data[] calldata loans, bytes calldata settlement)
@@ -68,7 +68,7 @@ contract LoanWithSettlementEncoder {
     }
 
     function extractSettlement(bytes memory encodedLoansWithSettlement) external pure returns (bytes memory) {
-        return encodedLoansWithSettlement.destroyAndExtractSettlement();
+        return encodedLoansWithSettlement.destroyToSettlement();
     }
 
     /// @dev An external call is the easiest way to copy a memory object by
@@ -119,12 +119,19 @@ contract LoansWithSettlementTest is Test {
         loanWithSettlementEncoder.encodeAndPopLoan(loans, settlement);
     }
 
-    function testFuzz_encodedDataEncodesSettlement(Loan.Data[] memory loans, bytes memory expectedSettlement)
-        external
-        view
-    {
-        bytes memory settlement = loanWithSettlementEncoder.encodeAndExtractSettlement(loans, expectedSettlement);
+    function testFuzz_extractsSettlementFromInputWithNoLoans(bytes memory expectedSettlement) external view {
+        bytes memory settlement =
+            loanWithSettlementEncoder.encodeAndExtractSettlement(new Loan.Data[](0), expectedSettlement);
         assertEq(settlement, expectedSettlement);
+    }
+
+    function testFuzz_revertsIfExtractingSettlementWithPendingLoans(
+        Loan.Data[] memory loans,
+        bytes memory expectedSettlement
+    ) external {
+        vm.assume(loans.length > 0);
+        vm.expectRevert("Pending loans");
+        loanWithSettlementEncoder.encodeAndExtractSettlement(loans, expectedSettlement);
     }
 
     function testFuzz_hashingIsSensitiveToChanges(Loan.Data[] memory loans, bytes memory settlement) external {

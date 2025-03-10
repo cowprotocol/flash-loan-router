@@ -97,7 +97,7 @@ contract FlashLoanRouter is IFlashLoanRouter {
             // We set the borrower to some value different from `READY` or any
             // intermediate borrower address to prevent reentrancy.
             pendingBorrower = SETTLING;
-            settle(loansWithSettlement.destroyAndExtractSettlement());
+            settle(loansWithSettlement.destroyToSettlement());
         } else {
             (uint256 amount, IBorrower borrower, address lender, IERC20 token) = loansWithSettlement.popLoan();
             pendingBorrower = borrower;
