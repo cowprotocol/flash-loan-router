@@ -28,8 +28,6 @@ contract DeployAAVEBorrower is Script {
             routerAddress = predictedRouterAddress;
         }
 
-        require(routerAddress != address(0), "Router contract not deployed");
-
         vm.startBroadcast();
 
         FlashLoanRouter flashLoanRouter = FlashLoanRouter(routerAddress);
