@@ -3,7 +3,7 @@ pragma solidity ^0.8;
 
 import {Test, Vm} from "forge-std/Test.sol";
 
-import {AaveBorrower, IAavePool, IERC20} from "src/AaveBorrower.sol";
+import {AaveBorrower, IAavePool} from "src/AaveBorrower.sol";
 import {FlashLoanRouter, Loan} from "src/FlashLoanRouter.sol";
 import {ICowSettlement} from "src/interface/IBorrower.sol";
 

@@ -87,10 +87,10 @@ contract LoansWithSettlementTest is Test {
 
     // Fuzz test input size needs to be limited to avoid out-of-memory reverts
     // (MemoryOOG).
-    uint256 constant MAX_FUZZ_LOAN_COUNT = 100;
-    uint256 constant MAX_FUZZ_SETTLEMENT_SIZE = 100_000;
+    uint256 private constant MAX_FUZZ_LOAN_COUNT = 100;
+    uint256 private constant MAX_FUZZ_SETTLEMENT_SIZE = 100_000;
 
-    LoanWithSettlementEncoder loanWithSettlementEncoder;
+    LoanWithSettlementEncoder private loanWithSettlementEncoder;
 
     function setUp() external {
         loanWithSettlementEncoder = new LoanWithSettlementEncoder();

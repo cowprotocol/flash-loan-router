@@ -63,9 +63,9 @@ contract FlashLoanRouterCaller {
 contract FlashLoanRouterTest is Test {
     using LoansWithSettlement for bytes;
 
-    FlashLoanRouterExposed router;
-    FlashLoanRouterCaller caller;
-    CowProtocolMock cowProtocolMock;
+    FlashLoanRouterExposed private router;
+    FlashLoanRouterCaller private caller;
+    CowProtocolMock private cowProtocolMock;
 
     function setUp() external {
         caller = new FlashLoanRouterCaller();
