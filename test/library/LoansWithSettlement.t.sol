@@ -5,28 +5,16 @@ import {Test} from "forge-std/Test.sol";
 
 import {IBorrower, IERC20, Loan, LoansWithSettlement} from "src/library/LoansWithSettlement.sol";
 
+import {someLoan} from "./Loan.t.sol";
 import {Bytes} from "test/test-lib/Bytes.sol";
-
-function someLoan(uint256 salt) pure returns (Loan.Data memory) {
-    return Loan.Data({
-        amount: uint256(keccak256(bytes.concat("any large number", bytes32(salt)))),
-        borrower: IBorrower(address(uint160(bytes20(keccak256(bytes.concat("some borrower address", bytes32(salt))))))),
-        lender: address(uint160(bytes20(keccak256(bytes.concat("some lender address", bytes32(salt)))))),
-        token: IERC20(address(uint160(bytes20(keccak256(bytes.concat("some token address", bytes32(salt)))))))
-    });
-}
 
 // We use a separate encoder contract instead of doing library operations
 // directly in the test to make sure that incorrect memory operations don't
 // break the state of the tests in a way that still makes them pass.
 contract LoanWithSettlementEncoder {
-    using LoansWithSettlement for LoansWithSettlement.Data;
+    using LoansWithSettlement for bytes;
 
-    function encode(Loan.Data[] calldata loans, bytes calldata settlement)
-        external
-        pure
-        returns (LoansWithSettlement.Data memory)
-    {
+    function encode(Loan.Data[] calldata loans, bytes calldata settlement) external pure returns (bytes memory) {
         return LoansWithSettlement.encode(loans, settlement);
     }
 
@@ -35,7 +23,7 @@ contract LoanWithSettlementEncoder {
         pure
         returns (uint256)
     {
-        LoansWithSettlement.Data memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
+        bytes memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
         return encodedLoansWithSettlement.loanCount();
     }
 
@@ -44,7 +32,7 @@ contract LoanWithSettlementEncoder {
         pure
         returns (Loan.Data memory loan)
     {
-        LoansWithSettlement.Data memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
+        bytes memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
         (uint256 amount, IBorrower borrower, address lender, IERC20 token) = encodedLoansWithSettlement.popLoan();
         loan = Loan.Data({amount: amount, borrower: borrower, lender: lender, token: token});
         require(encodedLoansWithSettlement.loanCount() == loans.length - 1, "popped length does not decrease by one");
@@ -55,8 +43,8 @@ contract LoanWithSettlementEncoder {
         pure
         returns (bytes memory)
     {
-        LoansWithSettlement.Data memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
-        return encodedLoansWithSettlement.settlement;
+        bytes memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
+        return encodedLoansWithSettlement.destroyToSettlement();
     }
 
     function encodePopLoanAndHash(Loan.Data[] calldata loans, bytes calldata settlement)
@@ -64,36 +52,38 @@ contract LoanWithSettlementEncoder {
         pure
         returns (bytes32)
     {
-        LoansWithSettlement.Data memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
+        bytes memory encodedLoansWithSettlement = LoansWithSettlement.encode(loans, settlement);
         encodedLoansWithSettlement.popLoan();
         return encodedLoansWithSettlement.hash();
     }
 
-    function popLoan(LoansWithSettlement.Data memory encodedLoansWithSettlement)
-        external
-        pure
-        returns (LoansWithSettlement.Data memory, Loan.Data memory)
-    {
+    function popLoan(bytes memory encodedLoansWithSettlement) external pure returns (bytes memory, Loan.Data memory) {
         (uint256 amount, IBorrower borrower, address lender, IERC20 token) = encodedLoansWithSettlement.popLoan();
         Loan.Data memory loan = Loan.Data({amount: amount, borrower: borrower, lender: lender, token: token});
         return (encodedLoansWithSettlement, loan);
     }
 
-    function hash(LoansWithSettlement.Data memory encodedLoansWithSettlement) external pure returns (bytes32) {
+    function hash(bytes memory encodedLoansWithSettlement) external pure returns (bytes32) {
         return encodedLoansWithSettlement.hash();
     }
 
-    function extractSettlement(LoansWithSettlement.Data memory encodedLoansWithSettlement)
+    function extractSettlement(bytes memory encodedLoansWithSettlement) external pure returns (bytes memory) {
+        return encodedLoansWithSettlement.destroyToSettlement();
+    }
+
+    /// @dev An external call is the easiest way to copy a memory object by
+    /// value in Solidity.
+    function copy(Loan.Data[] calldata loans, bytes memory settlement)
         external
         pure
-        returns (bytes memory)
+        returns (Loan.Data[] memory, bytes memory)
     {
-        return encodedLoansWithSettlement.settlement;
+        return (loans, settlement);
     }
 }
 
 contract LoansWithSettlementTest is Test {
-    using LoansWithSettlement for LoansWithSettlement.Data;
+    using LoansWithSettlement for bytes;
 
     // Fuzz test input size needs to be limited to avoid out-of-memory reverts
     // (MemoryOOG).
@@ -129,50 +119,64 @@ contract LoansWithSettlementTest is Test {
         loanWithSettlementEncoder.encodeAndPopLoan(loans, settlement);
     }
 
-    function testFuzz_encodedDataEncodesSettlement(Loan.Data[] memory loans, bytes memory expectedSettlement)
-        external
-        view
-    {
-        bytes memory settlement = loanWithSettlementEncoder.encodeAndExtractSettlement(loans, expectedSettlement);
+    function testFuzz_extractsSettlementFromInputWithNoLoans(bytes memory expectedSettlement) external view {
+        bytes memory settlement =
+            loanWithSettlementEncoder.encodeAndExtractSettlement(new Loan.Data[](0), expectedSettlement);
         assertEq(settlement, expectedSettlement);
     }
 
+    function testFuzz_revertsIfExtractingSettlementWithPendingLoans(
+        Loan.Data[] memory loans,
+        bytes memory expectedSettlement
+    ) external {
+        vm.assume(loans.length > 0);
+        vm.expectRevert("Pending loans");
+        loanWithSettlementEncoder.encodeAndExtractSettlement(loans, expectedSettlement);
+    }
+
     function testFuzz_hashingIsSensitiveToChanges(Loan.Data[] memory loans, bytes memory settlement) external {
-        LoansWithSettlement.Data memory data = loanWithSettlementEncoder.encode(loans, settlement);
-        uint256 loanCount = data.loanCount();
-        uint256 settlementSize = data.settlement.length;
+        uint256 loanCount = loans.length;
+        uint256 settlementSize = settlement.length;
+        bytes memory data = loanWithSettlementEncoder.encode(loans, settlement);
         bytes32 originalHash = loanWithSettlementEncoder.hash(data);
 
+        Loan.Data[] memory newLoans;
+        bytes memory newSettlement;
         if (loanCount > 0) {
-            data = loanWithSettlementEncoder.encode(loans, settlement);
-            data.loans[vm.randomUint(0, loanCount - 1)].amount = vm.randomUint(0, type(uint256).max);
+            (newLoans, newSettlement) = loanWithSettlementEncoder.copy(loans, settlement);
+            newLoans[vm.randomUint(0, loanCount - 1)].amount = vm.randomUint(0, type(uint256).max);
+            data = loanWithSettlementEncoder.encode(newLoans, newSettlement);
             assertNotEq(loanWithSettlementEncoder.hash(data), originalHash);
 
-            data = loanWithSettlementEncoder.encode(loans, settlement);
-            data.loans[vm.randomUint(0, loanCount - 1)].borrower = IBorrower(vm.randomAddress());
+            (newLoans, newSettlement) = loanWithSettlementEncoder.copy(loans, settlement);
+            newLoans[vm.randomUint(0, loanCount - 1)].borrower = IBorrower(vm.randomAddress());
+            data = loanWithSettlementEncoder.encode(newLoans, newSettlement);
             assertNotEq(loanWithSettlementEncoder.hash(data), originalHash);
 
-            data = loanWithSettlementEncoder.encode(loans, settlement);
-            data.loans[vm.randomUint(0, loanCount - 1)].lender = vm.randomAddress();
+            (newLoans, newSettlement) = loanWithSettlementEncoder.copy(loans, settlement);
+            newLoans[vm.randomUint(0, loanCount - 1)].lender = vm.randomAddress();
+            data = loanWithSettlementEncoder.encode(newLoans, newSettlement);
             assertNotEq(loanWithSettlementEncoder.hash(data), originalHash);
 
-            data = loanWithSettlementEncoder.encode(loans, settlement);
-            data.loans[vm.randomUint(0, loanCount - 1)].token = IERC20(vm.randomAddress());
+            (newLoans, newSettlement) = loanWithSettlementEncoder.copy(loans, settlement);
+            newLoans[vm.randomUint(0, loanCount - 1)].token = IERC20(vm.randomAddress());
+            data = loanWithSettlementEncoder.encode(newLoans, newSettlement);
             assertNotEq(loanWithSettlementEncoder.hash(data), originalHash);
         }
 
         if (settlementSize > 0) {
-            data = loanWithSettlementEncoder.encode(loans, settlement);
+            (newLoans, newSettlement) = loanWithSettlementEncoder.copy(loans, settlement);
             bytes1 randomByte = bytes1(uint8(vm.randomUint(0, type(uint8).max)));
             uint256 randomIndex = vm.randomUint(0, settlementSize - 1);
 
-            if (randomByte == data.settlement[randomIndex]) {
+            if (randomByte == newSettlement[randomIndex]) {
                 // We force the random byte to be different.
                 unchecked {
                     randomByte = bytes1(uint8(randomByte) + 1);
                 }
             }
-            data.settlement[randomIndex] = randomByte;
+            newSettlement[randomIndex] = randomByte;
+            data = loanWithSettlementEncoder.encode(newLoans, newSettlement);
             assertNotEq(loanWithSettlementEncoder.hash(data), originalHash);
         }
     }
@@ -182,7 +186,7 @@ contract LoansWithSettlementTest is Test {
         Loan.Data memory extraLoan,
         bytes memory settlement
     ) external view {
-        LoansWithSettlement.Data memory loanWithSettlement = loanWithSettlementEncoder.encode(loans, settlement);
+        bytes memory loanWithSettlement = loanWithSettlementEncoder.encode(loans, settlement);
 
         Loan.Data[] memory extendedLoans = new Loan.Data[](loans.length + 1);
         extendedLoans[0] = extraLoan;
@@ -194,6 +198,43 @@ contract LoansWithSettlementTest is Test {
             loanWithSettlementEncoder.encodePopLoanAndHash(extendedLoans, settlement),
             loanWithSettlementEncoder.hash(loanWithSettlement)
         );
+    }
+
+    function test_encodedBytestringMatches() external view {
+        Loan.Data[] memory loans = new Loan.Data[](2);
+        loans[0] = Loan.Data({
+            amount: 0x0101010101010101010101010101010101010101010101010101010101010101, // 32 bytes
+            borrower: IBorrower(0x0202020202020202020202020202020202020202),
+            lender: address(0x0303030303030303030303030303030303030303),
+            token: IERC20(address(0x0404040404040404040404040404040404040404))
+        });
+        loans[1] = Loan.Data({
+            amount: 0x1111111111111111111111111111111111111111111111111111111111111111, // 32 bytes
+            borrower: IBorrower(0x1212121212121212121212121212121212121212),
+            lender: address(0x1313131313131313131313131313131313131313),
+            token: IERC20(address(0x1414141414141414141414141414141414141414))
+        });
+        bytes memory settlement =
+            hex"2021222324252627282920212223242526272829202122232425262728292021222324252627282920212223242526272829";
+
+        bytes memory expectedEncodedBytestring = bytes.concat(
+            hex"0000000000000000000000000000000000000000000000000000000000000002", // number of loans in 32 bytes
+            // settlement
+            hex"2021222324252627282920212223242526272829202122232425262728292021222324252627282920212223242526272829",
+            // second loan
+            hex"1111111111111111111111111111111111111111111111111111111111111111",
+            hex"1212121212121212121212121212121212121212",
+            hex"1313131313131313131313131313131313131313",
+            hex"1414141414141414141414141414141414141414",
+            // first loan
+            hex"0101010101010101010101010101010101010101010101010101010101010101",
+            hex"0202020202020202020202020202020202020202",
+            hex"0303030303030303030303030303030303030303",
+            hex"0404040404040404040404040404040404040404"
+        );
+
+        bytes memory encodedBytestring = loanWithSettlementEncoder.encode(loans, settlement);
+        assertEq(encodedBytestring, expectedEncodedBytestring);
     }
 
     /// This tests populates the struct with arbitrary data and pops all
@@ -212,7 +253,7 @@ contract LoansWithSettlementTest is Test {
         bytes memory settlement = Bytes.sequentialByteArrayOfSize(settlementSize);
         // We need to use the encoder and not the library because `encode`
         // expects the data to be stored in `calldata`.
-        LoansWithSettlement.Data memory encodedLoansWithSettlement = loanWithSettlementEncoder.encode(loans, settlement);
+        bytes memory encodedLoansWithSettlement = loanWithSettlementEncoder.encode(loans, settlement);
 
         assertEq(encodedLoansWithSettlement.loanCount(), loans.length);
 
@@ -228,7 +269,7 @@ contract LoansWithSettlementTest is Test {
                 string.concat("loan count does not match at index i=", vm.toString(i))
             );
         }
-        bytes memory extractedSettlement = encodedLoansWithSettlement.settlement;
+        bytes memory extractedSettlement = loanWithSettlementEncoder.extractSettlement(encodedLoansWithSettlement);
         assertEq(extractedSettlement, settlement, "settlement does not match");
     }
 
@@ -249,7 +290,7 @@ contract LoansWithSettlementTest is Test {
             loans[i] = someLoan(i);
         }
         bytes memory settlement = Bytes.sequentialByteArrayOfSize(settlementSize);
-        LoansWithSettlement.Data memory encodedLoansWithSettlement = loanWithSettlementEncoder.encode(loans, settlement);
+        bytes memory encodedLoansWithSettlement = loanWithSettlementEncoder.encode(loans, settlement);
 
         assertEq(encodedLoansWithSettlement.loanCount(), loans.length);
 
