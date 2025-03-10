@@ -19,7 +19,7 @@ contract ERC3156Borrower is Borrower, IERC3156FlashBorrower {
     constructor(IFlashLoanRouter _router) Borrower(_router) {}
 
     /// @inheritdoc Borrower
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory callBackData)
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes calldata callBackData)
         internal
         override
     {

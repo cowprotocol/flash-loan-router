@@ -16,7 +16,7 @@ contract AaveBorrower is Borrower, IAaveFlashLoanReceiver {
     constructor(IFlashLoanRouter _router) Borrower(_router) {}
 
     /// @inheritdoc Borrower
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory callBackData)
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes calldata callBackData)
         internal
         override
     {
@@ -33,7 +33,7 @@ contract AaveBorrower is Borrower, IAaveFlashLoanReceiver {
         interestRateModes[0] = 0;
         // The next value is technically unused, since `interestRateMode` is 0.
         address onBehalfOf = address(this);
-        bytes memory params = callBackData;
+        bytes calldata params = callBackData;
         // Referral supply is currently inactive
         uint16 referralCode = 0;
         IAavePool(lender).flashLoan(

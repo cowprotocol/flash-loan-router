@@ -10,14 +10,14 @@ contract BorrowerImplementation is Borrower {
 
     constructor(IFlashLoanRouter _router) Borrower(_router) {}
 
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory callBackData)
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes calldata callBackData)
         internal
         override
     {
         emit FlashLoanTriggered(lender, token, amount, callBackData);
     }
 
-    function flashLoanCallBackExposed(bytes memory callBackData) external {
+    function flashLoanCallBackExposed(bytes calldata callBackData) external {
         flashLoanCallBack(callBackData);
     }
 }
