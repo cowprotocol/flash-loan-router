@@ -8,7 +8,7 @@ The flash-loan router lets a solver specify a list of flash-loan requests as wel
 
 Any registered CoW-Protocol solver can use this contract to execute settlements by proxy.
 
-The entry point to the router is the function `flashLoanAndSettle`.
+The entry point to the [router](src/FlashLoanRouter.sol) is the function `flashLoanAndSettle`.
 It takes a list of loans with the following entries for each loan:
 
 - The loaned amount and ERC-20 token.
