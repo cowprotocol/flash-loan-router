@@ -4,32 +4,25 @@ pragma solidity ^0.8.28;
 import {Script, console} from "forge-std/Script.sol";
 
 import {AaveBorrower} from "../../src/AaveBorrower.sol";
-import {FlashLoanRouter} from "../../src/FlashLoanRouter.sol";
+
+import {DeployFlashLoanRouter, FlashLoanRouter} from "./DeployFlashLoanRouter.s.sol";
 
 import {Constants} from "script/libraries/Constants.sol";
-import {AddressUtils} from "script/libraries/AddressUtils.sol";
 
-contract DeployAAVEBorrower is Script {
-    using AddressUtils for address;
-
-    function run() public virtual {
+contract DeployAAVEBorrower is Script, DeployFlashLoanRouter {
+    function run() public virtual override(DeployFlashLoanRouter) {
         deployAAVEBorrower(FlashLoanRouter(address(0)));
     }
 
     function deployAAVEBorrower(FlashLoanRouter router) internal returns (AaveBorrower borrower) {
         address routerAddress;
 
-        address predictedRouterAddress =
-            Constants.DETERMINISTIC_DEPLOYER.computeCreate2Address(Constants.SALT, type(FlashLoanRouter).creationCode);
-
         if (address(router) != address(0)) {
             routerAddress = address(router);
-        } else if (predictedRouterAddress.isContract()) {
-            routerAddress = predictedRouterAddress;
+        } else {
+            routerAddress = address(newFlashLoanRouter());
         }
 
-        require(routerAddress != address(0), "Router address is not set");
-        
         vm.startBroadcast();
 
         FlashLoanRouter flashLoanRouter = FlashLoanRouter(routerAddress);
