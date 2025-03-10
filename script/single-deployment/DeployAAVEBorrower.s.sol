@@ -15,13 +15,7 @@ contract DeployAAVEBorrower is Script, DeployFlashLoanRouter {
     }
 
     function deployAAVEBorrower(FlashLoanRouter router) internal returns (AaveBorrower borrower) {
-        address routerAddress;
-
-        if (address(router) != address(0)) {
-            routerAddress = address(router);
-        } else {
-            routerAddress = address(newFlashLoanRouter());
-        }
+        address routerAddress = address(router) != address(0) ? address(router) : address(newFlashLoanRouter());
 
         vm.startBroadcast();
 
