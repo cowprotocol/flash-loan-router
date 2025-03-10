@@ -28,11 +28,13 @@ contract DeployAAVEBorrower is Script {
             routerAddress = predictedRouterAddress;
         }
 
-        require(routerAddress != address(0), "Router contract not deployed.");
+        require(routerAddress != address(0), "Router contract not deployed");
 
         vm.startBroadcast();
 
         FlashLoanRouter flashLoanRouter = FlashLoanRouter(routerAddress);
+        require(address(flashLoanRouter.settlementContract()) == Constants.DEFAULT_SETTLEMENT_CONTRACT, "Settlement contract varies in flashLoanRouter");
+
         borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
         console.log("AaveBorrower deployed at:", address(borrower));
 
