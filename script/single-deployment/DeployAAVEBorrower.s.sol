@@ -7,28 +7,32 @@ import {AaveBorrower} from "../../src/AaveBorrower.sol";
 import {FlashLoanRouter} from "../../src/FlashLoanRouter.sol";
 
 import {Constants} from "script/libraries/Constants.sol";
+import {AddressUtils} from "script/libraries/AddressUtils.sol";
 
 contract DeployAAVEBorrower is Script {
+    using AddressUtils for address;
+
     function run() public virtual {
         deployAAVEBorrower(FlashLoanRouter(address(0)));
     }
 
-    // Deploy AaveBorrower with optional router input or fallback to env
     function deployAAVEBorrower(FlashLoanRouter router) internal returns (AaveBorrower borrower) {
-        // Ensure the router address is provided or fallback to the environment variable
         address routerAddress;
-        
+
+        address predictedRouterAddress =
+            Constants.DETERMINISTIC_DEPLOYER.computeCreate2Address(Constants.SALT, type(FlashLoanRouter).creationCode);
+
         if (address(router) != address(0)) {
             routerAddress = address(router);
-        } else {
-            routerAddress = vm.envAddress("FLASHLOAN_ROUTER_ADDRESS");
+        } else if (predictedRouterAddress.isContract()) {
+            routerAddress = predictedRouterAddress;
         }
-        
+
+        require(routerAddress != address(0), "Router contract not deployed.");
+
         vm.startBroadcast();
 
-        // Use the router (either provided or from env variable)
         FlashLoanRouter flashLoanRouter = FlashLoanRouter(routerAddress);
-        
         borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
         console.log("AaveBorrower deployed at:", address(borrower));
 
