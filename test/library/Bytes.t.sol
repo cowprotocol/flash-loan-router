@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {Bytes} from "src/library/Bytes.sol";
 
@@ -12,7 +12,6 @@ contract Allocator {
     using Bytes for bytes;
 
     function allocate(uint256 length) external pure returns (bytes memory) {
-        console.log(length);
         return Bytes.allocate(length);
     }
 
@@ -29,7 +28,7 @@ contract Allocator {
 contract BytesTest is Test {
     using Bytes for bytes;
 
-    Allocator allocator;
+    Allocator private allocator;
 
     function setUp() external {
         allocator = new Allocator();

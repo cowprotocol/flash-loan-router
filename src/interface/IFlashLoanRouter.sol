@@ -2,9 +2,7 @@
 pragma solidity ^0.8;
 
 import {Loan} from "../library/Loan.sol";
-import {LoansWithSettlement} from "../library/LoansWithSettlement.sol";
 import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
-import {IERC20} from "../vendored/IERC20.sol";
 import {ICowSettlement} from "./ICowSettlement.sol";
 
 /// @title Flash-loan Router Interface

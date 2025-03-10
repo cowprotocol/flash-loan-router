@@ -46,7 +46,7 @@ contract RoundTripEncoder {
 }
 
 contract LoanTest is Test {
-    RoundTripEncoder encoder;
+    RoundTripEncoder private encoder;
 
     function setUp() external {
         encoder = new RoundTripEncoder();

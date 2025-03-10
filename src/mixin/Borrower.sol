@@ -4,7 +4,6 @@ pragma solidity ^0.8;
 import {IBorrower} from "../interface/IBorrower.sol";
 import {ICowSettlement} from "../interface/ICowSettlement.sol";
 import {IFlashLoanRouter} from "../interface/IFlashLoanRouter.sol";
-import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
 import {IERC20} from "../vendored/IERC20.sol";
 import {SafeERC20} from "../vendored/SafeERC20.sol";
 
