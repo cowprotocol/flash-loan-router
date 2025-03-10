@@ -12,6 +12,7 @@ library AddressUtils {
     }
 
     function isContract(address addr) internal view returns (bool) {
+        if (addr == address(0)) return false;
         uint256 size;
         assembly {
             size := extcodesize(addr)
