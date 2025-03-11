@@ -10,8 +10,7 @@ import {Constants} from "../libraries/Constants.sol";
 
 /// @title Deploy FlashLoan Router
 /// @author CoW DAO developers
-/// @notice A contract that deploys a flash-loan router that adds support for
-/// Aave protocol.
+/// @notice A contract that deploys a flash-loan router contract
 contract DeployFlashLoanRouter is Script {
     function run() public virtual {
         deployFlashLoanRouter();
