@@ -30,14 +30,17 @@ contract DeployAAVEBorrower is Script {
     * with a valid FlashLoanRouter instance.
     * The deployment is done using a fixed salt (`Constants.SALT`), ensuring that 
     * the address of the `AaveBorrower` is deterministic.
+    * 
     * - If a `FlashLoanRouter` instance is passed, it will be used directly.
+    * 
     * - If the `FlashLoanRouter` address is `0x0`, it will attempt to retrieve 
     * the address from the environment variable `FLASHLOAN_ROUTER_ADDRESS` and revert if 
     * the environment variable is not set.
+    * 
     * - The function ensures that the FlashLoanRouter contract is properly deployed 
     * and has the correct settlement contract address (`Constants.DEFAULT_SETTLEMENT_CONTRACT`).
     * 
-    * If the FlashLoanRouter contract is not deployed at the expected address or the 
+    * - If the FlashLoanRouter contract is not deployed at the expected address or the 
     * settlement contract is incorrect, the deployment will revert.
     * 
     * @param router The FlashLoanRouter instance, or `address(0)` to retrieve the router address from an environment variable.
