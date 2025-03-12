@@ -38,13 +38,13 @@
       "runs": 1000000,
       "details": {
         "peephole": true,
-        "inliner": false,
+        "inliner": true,
         "jumpdestRemover": true,
-        "orderLiterals": false,
-        "deduplicate": false,
-        "cse": false,
-        "constantOptimizer": false,
-        "yul": false,
+        "orderLiterals": true,
+        "deduplicate": true,
+        "cse": true,
+        "constantOptimizer": true,
+        "yul": true,
         "simpleCounterForLoopUncheckedIncrement": true
       }
     },
