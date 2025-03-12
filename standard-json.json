@@ -34,7 +34,7 @@
       "forge-std/=lib/forge-std/src/"
     ],
     "optimizer": {
-      "enabled": false,
+      "enabled": true,
       "runs": 1000000
     },
     "metadata": {
