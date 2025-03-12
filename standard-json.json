@@ -37,15 +37,15 @@
       "enabled": true,
       "runs": 1000000,
       "details": {
-        "peephole": true,
-        "inliner": true,
-        "jumpdestRemover": true,
-        "orderLiterals": true,
-        "deduplicate": true,
-        "cse": true,
-        "constantOptimizer": true,
-        "yul": true,
-        "simpleCounterForLoopUncheckedIncrement": true
+        "peephole": false,
+        "inliner": false,
+        "jumpdestRemover": false,
+        "orderLiterals": false,
+        "deduplicate": false,
+        "cse": false,
+        "constantOptimizer": false,
+        "yul": false,
+        "simpleCounterForLoopUncheckedIncrement": false
       }
     },
     "metadata": {
