@@ -36,7 +36,17 @@
     "optimizer": {
       "enabled": true,
       "runs": 1000000,
-      "details": {}
+      "details": {
+        "peephole": true,
+        "inliner": false,
+        "jumpdestRemover": true,
+        "orderLiterals": false,
+        "deduplicate": false,
+        "cse": false,
+        "constantOptimizer": false,
+        "yul": false,
+        "simpleCounterForLoopUncheckedIncrement": true
+      }
     },
     "metadata": {
       "useLiteralContent": false,
