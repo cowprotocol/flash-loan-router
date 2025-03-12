@@ -31,7 +31,7 @@ For safe operations, like an approval for the settlement contract to spend the f
 At the start of the settlement, it's expected that the loaned funds are transferred from the borrowers to where they are needed. For example, this can be the settlement contract itself, or the address of a user who wants to use the loan to retrieve the collateral needed to avoid liquidations.
 In general, solvers have full flexibility in deciding how loaned funds are allocated.
 
-The settlement is also reponsible for repaying the flash loans.
+The settlement is also responsible for repaying the flash loans.
 The specific repayment mechanism depends on the lender, but a common process is having the settlement contract send back the borrowed funds to the borrower and set an approval to the lender for spending the funds of the borrower: then the lender is going to pull back the funds with an ERC-20 `transferFrom` after the settlement is terminated.
 Inability to pay for a flash loan will most likely be met by a reverting transaction.
 
@@ -43,7 +43,7 @@ We support the following flash-loan lenders:
 Support for further flash-loan lenders can be added in the future.
 
 This repository provides an abstract `Borrower` implementation that encodes much of the logic expected from a borrower.
-Concrete borrower implementations can be built by inheriting this contract and implementing two functions: `triggerFlashLoan`, which describes how to call the lender to request a flash loan, and the lender-specific call-back function that internallly forwards the call to `Borrower.flashLoanCallBack`.
+Concrete borrower implementations can be built by inheriting this contract and implementing two functions: `triggerFlashLoan`, which describes how to call the lender to request a flash loan, and the lender-specific call-back function that internally forwards the call to `Borrower.flashLoanCallBack`.
 
 ### Example: a settlement with two loans, Aave and Maker
 
