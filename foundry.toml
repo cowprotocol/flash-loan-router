@@ -8,6 +8,15 @@ solc = "0.8.28"
 optimizer = true
 optimizer_runs = 1000000
 [profile.default.optimizer_details]
+peephole = true
+inliner = false
+jumpdestRemover = true
+orderLiterals = false
+deduplicate = false
+cse = false
+constantOptimizer = false
+simpleCounterForLoopUncheckedIncrement = true
+yul = false
 
 # Test settings
 # The following flag is used to give better control of the transient storage
