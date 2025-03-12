@@ -5,7 +5,7 @@ libs = ["lib"]
 
 # Compiler settings
 solc = "0.8.28"
-optimizer = true
+optimizer = false
 optimizer_runs = 1000000
 
 # Test settings
