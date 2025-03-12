@@ -9,14 +9,14 @@ optimizer = true
 optimizer_runs = 1000000
 [profile.default.optimizer_details]
 peephole = true
-inliner = false
+inliner = true
 jumpdestRemover = true
-orderLiterals = false
-deduplicate = false
-cse = false
-constantOptimizer = false
+orderLiterals = true
+deduplicate = true
+cse = true
+constantOptimizer = true
 simpleCounterForLoopUncheckedIncrement = true
-yul = false
+yul = true
 
 # Test settings
 # The following flag is used to give better control of the transient storage
