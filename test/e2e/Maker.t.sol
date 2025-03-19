@@ -3,8 +3,8 @@ pragma solidity ^0.8;
 
 import {Test, Vm} from "forge-std/Test.sol";
 
-import {ERC3156Borrower, IERC20, IERC3156FlashLender} from "src/ERC3156Borrower.sol";
-import {FlashLoanRouter, IBorrower, ICowSettlement, Loan} from "src/FlashLoanRouter.sol";
+import {ERC3156Borrower, IERC3156FlashLender} from "src/ERC3156Borrower.sol";
+import {FlashLoanRouter, ICowSettlement, Loan} from "src/FlashLoanRouter.sol";
 
 import {CowProtocol} from "./lib//CowProtocol.sol";
 import {Constants} from "./lib/Constants.sol";

@@ -6,8 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {ERC3156Borrower, IERC20, IERC3156FlashLender, IFlashLoanRouter} from "src/ERC3156Borrower.sol";
 
 contract ERC3156BorrowerTest is Test {
-    IFlashLoanRouter router;
-    ERC3156Borrower borrower;
+    IFlashLoanRouter private router;
+    ERC3156Borrower private borrower;
 
     function setUp() external {
         router = IFlashLoanRouter(makeAddr("ERC3156BorrowerTest: router"));

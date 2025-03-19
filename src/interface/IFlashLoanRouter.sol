@@ -2,9 +2,7 @@
 pragma solidity ^0.8;
 
 import {Loan} from "../library/Loan.sol";
-import {LoansWithSettlement} from "../library/LoansWithSettlement.sol";
 import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
-import {IERC20} from "../vendored/IERC20.sol";
 import {ICowSettlement} from "./ICowSettlement.sol";
 
 /// @title Flash-loan Router Interface
@@ -29,7 +27,7 @@ interface IFlashLoanRouter {
     /// data cannot change during execution. Only the settle function can be
     /// called. All of this is also the case if the lender is untrusted.
     /// @param loans The list of flash loans to be requested before the
-    /// settlement are executed. The loans will be requested in the specified
+    /// settlement is executed. The loans will be requested in the specified
     /// order.
     /// @param settlement The ABI-encoded bytes for a call to `settle()` (as
     /// in `abi.encodeCall`).

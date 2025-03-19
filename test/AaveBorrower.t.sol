@@ -3,11 +3,11 @@ pragma solidity ^0.8;
 
 import {Test} from "forge-std/Test.sol";
 
-import {AaveBorrower, IAaveFlashLoanReceiver, IAavePool, IERC20, IFlashLoanRouter} from "src/AaveBorrower.sol";
+import {AaveBorrower, IAavePool, IERC20, IFlashLoanRouter} from "src/AaveBorrower.sol";
 
 contract AaveBorrowerTest is Test {
-    IFlashLoanRouter router;
-    AaveBorrower borrower;
+    IFlashLoanRouter private router;
+    AaveBorrower private borrower;
 
     function setUp() external {
         router = IFlashLoanRouter(makeAddr("AaveBorrowerTest: router"));
