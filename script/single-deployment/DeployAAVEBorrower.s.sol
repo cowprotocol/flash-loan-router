@@ -42,13 +42,14 @@ contract DeployAAVEBorrower is Script {
     * 
     */
     function deployAAVEBorrower(FlashLoanRouter flashLoanRouter) internal returns (AaveBorrower borrower) {
-        require(address(flashLoanRouter.settlementContract()) == Constants.DEFAULT_SETTLEMENT_CONTRACT, "Settlement contract varies in flashLoanRouter");
+        require(
+            address(flashLoanRouter.settlementContract()) == Constants.DEFAULT_SETTLEMENT_CONTRACT, 
+            "Settlement contract varies in flashLoanRouter"
+        );
         
-        vm.startBroadcast();
-
+        vm.broadcast();
         borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
+        
         console.log("AaveBorrower deployed at:", address(borrower));
-
-        vm.stopBroadcast();
     }
 }
