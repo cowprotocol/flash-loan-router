@@ -137,18 +137,42 @@ $ forge fmt
 
 The deployment [scripts](script) permit the deployment of a single contract or all contracts at once.
 
-#### Deploy a Single Contract
+#### Environment setup
 
-The deploy a single contract, the scripts within the [script/single-deployment](script/single-deployment) directory are used, e.g., to deploy the `FlashLoanRouter.sol` contract, the command below is used:
+Copy the `.env.example` to `.env` and set the applicable configuration variables for the testing / deployment environment.
 
-```shell
-$ forge script script/single-deployment/DeployFlashLoanRouter.s.sol:DeployFlashLoanRouter --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
 
 #### Deploy All Contracts
 
-To deploy all contracts, the [DeployAllContracts](script/DeployAllContracts.s.sol) script is used. This will run the deployments for FlashLoanRouter and Borrower contracts specified in the script.
+Deployment is handled by solidity scripts in `forge`. The network being deployed to is dependent on the `ETH_RPC_URL`.
+
+To deploy all contracts in a single run, the [DeployAllContracts](script/DeployAllContracts.s.sol) script is used. This will run the deployments for FlashLoanRouter and Borrower contracts specified in the script.
 
 ```shell
-$ forge script script/DeployAllContracts.s.sol:DeployAllContracts --rpc-url <your_rpc_url> --private-key <your_private_key>
+source .env
+
+forge script script/DeployAllContracts.s.sol:DeployAllContracts --rpc-url $ETH_RPC_URL --private-key $PRIVATE_KEY --broadcast
+```
+
+For Etherscan verification, ensure that the `ETHERSCAN_API_KEY` environment variable is set and add the `--verify` flag to the `forge script` deployment commands.
+
+
+#### Deploy a Single Contract
+
+To deploy a single contract, the scripts within the [script/single-deployment](script/single-deployment) directory are used, e.g., to deploy the `FlashLoanRouter.sol` contract, the command below is used:
+
+```shell
+source .env
+
+forge script script/single-deployment/DeployFlashLoanRouter.s.sol:DeployFlashLoanRouter --rpc-url $ETH_RPC_URL --private-key $PRIVATE_KEY --broadcast
+```
+
+#### Deployment addresses
+
+The file [`networks.json`](./networks.json) lists all official deployments of the contracts in this repository by chain id.
+
+The deployment addresses file is generated with:
+
+```shell
+bash dev/generate-networks-file.sh > networks.json
 ```
