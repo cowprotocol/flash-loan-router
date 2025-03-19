@@ -17,12 +17,13 @@ contract DeployAAVEBorrower is Script {
     /**
     * @dev Executes the deployment of the `AaveBorrower` contract.
     * 
-    * This function calls the `deployAAVEBorrower` method with `FlashLoanRouter(address(0))`,
-    * which triggers the retrieval of the `FlashLoanRouter` address from the environment variable 
+    * This function calls the `deployAAVEBorrower` method with 
+    * the `FlashLoanRouter` address from the environment variable 
     * `FLASHLOAN_ROUTER_ADDRESS`.
     */
     function run() public virtual {
-        deployAAVEBorrower(FlashLoanRouter(address(0)));
+        FlashLoanRouter flashLoanRouter = FlashLoanRouter(vm.envAddress("FLASHLOAN_ROUTER_ADDRESS"));
+        deployAAVEBorrower(flashLoanRouter);
     }
 
     /**
@@ -30,20 +31,14 @@ contract DeployAAVEBorrower is Script {
     * with a valid FlashLoanRouter instance.
     * The deployment is done using a fixed salt (`Constants.SALT`), ensuring that 
     * the address of the `AaveBorrower` is deterministic.
-    * 
-    * - If a `FlashLoanRouter` instance is passed, it will be used directly.
-    * 
-    * - If the `FlashLoanRouter` address is `0x0`, it will attempt to retrieve 
-    * the address from the environment variable `FLASHLOAN_ROUTER_ADDRESS` and revert if 
-    * the environment variable is not set.
-    * 
+    *  
     * - The function ensures that the FlashLoanRouter contract is properly deployed 
-    * and has the correct settlement contract address (`Constants.DEFAULT_SETTLEMENT_CONTRACT`).
+    * i.e., it has the correct settlement contract address (`Constants.DEFAULT_SETTLEMENT_CONTRACT`).
     * 
     * - If the FlashLoanRouter contract is not deployed at the expected address or the 
     * settlement contract is incorrect, the deployment will revert.
     * 
-    * @param router The FlashLoanRouter instance, or `address(0)` to retrieve the router address from an environment variable.
+    * @param flashLoanRouter The FlashLoanRouter instance.
     * @return borrower The deployed AaveBorrower contract instance.
     * 
     * @notice If the FlashLoanRouter contract address is generated using `CREATE2` 
@@ -53,11 +48,7 @@ contract DeployAAVEBorrower is Script {
     *         This issue is avoided by passing the address directly as an environment 
     *         variable (`FLASHLOAN_ROUTER_ADDRESS`).
     */
-    function deployAAVEBorrower(FlashLoanRouter router) internal returns (AaveBorrower borrower) {
-        FlashLoanRouter flashLoanRouter = address(router) != address(0) 
-            ? FlashLoanRouter(address(router)) 
-            : FlashLoanRouter(vm.envAddress("FLASHLOAN_ROUTER_ADDRESS"));
-        
+    function deployAAVEBorrower(FlashLoanRouter flashLoanRouter) internal returns (AaveBorrower borrower) {
         require(address(flashLoanRouter.settlementContract()) == Constants.DEFAULT_SETTLEMENT_CONTRACT, "Settlement contract varies in flashLoanRouter");
         
         vm.startBroadcast();
