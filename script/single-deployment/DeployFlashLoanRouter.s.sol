@@ -31,10 +31,13 @@ contract DeployFlashLoanRouter is Script {
     * 
     * @return router The deployed `FlashLoanRouter` contract instance.
     * 
-    * @notice The deployment of the `FlashLoanRouter` contract will use a fixed 
-    *         salt (`Constants.SALT`), to ensure the address 
-    *         of the contract is deterministic. If a contract is already deployed at the address, 
-    *         this would cause a revert due to a `CREATE2` address collision.
+    * @notice The FlashLoanRouter contract address is generated using `CREATE2` 
+    *         with a deterministic salt (e.g., `new FlashLoanRouter{salt: Constants.SALT}(cowSettlement)`), 
+    *         and the simulation of `AaveBorrower` deployment will revert with a `CREATE2` 
+    *         collision error when deploying all contracts, if there is already 
+    *         an existing contract at the same address.
+    *         This issue is avoided by passing the address directly as an environment 
+    *         variable (`FLASHLOAN_ROUTER_ADDRESS`).
     */
     function deployFlashLoanRouter() internal returns (FlashLoanRouter router) {
         vm.startBroadcast();
