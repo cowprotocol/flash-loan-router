@@ -3,11 +3,10 @@ pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {AaveBorrower} from "../../src/AaveBorrower.sol";
+import {AaveBorrower} from "src/AaveBorrower.sol";
+import {FlashLoanRouter} from "src/FlashLoanRouter.sol";
 
-import {FlashLoanRouter} from "./DeployFlashLoanRouter.s.sol";
-
-import {Constants} from "script/libraries/Constants.sol";
+import {Constants} from "../libraries/Constants.sol";
 
 /// @title Deploy Aave Borrower
 /// @author CoW DAO developers
