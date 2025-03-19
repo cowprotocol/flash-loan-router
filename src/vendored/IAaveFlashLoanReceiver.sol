@@ -2,14 +2,12 @@
 pragma solidity ^0.8.0;
 
 // Vendored from Aave DAO contracts with minor modifications:
-// - Removed view functions `ADDRESSES_PROVIDER` and `POOL`.
+// - Removed view functions `ADDRESSES_PROVIDER` and `POOL` (and related import)
 // - Changed contract name to make it specific to Aave
 // - Updated imports
 // - Formatted code
 // <https://github.com/aave-dao/aave-v3-origin/blob/v3.1.0/src/core/contracts/flashloan/interfaces/IFlashLoanReceiver.sol>
 // Note: v3.1.0 points to commit e627c7428cbb358b9c84b601a009a86b4b871c08.
-
-import {IAavePool as IPool} from "./IAavePool.sol";
 
 /**
  * @title IFlashLoanReceiver

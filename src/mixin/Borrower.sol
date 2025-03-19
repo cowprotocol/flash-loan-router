@@ -4,7 +4,6 @@ pragma solidity ^0.8;
 import {IBorrower} from "../interface/IBorrower.sol";
 import {ICowSettlement} from "../interface/ICowSettlement.sol";
 import {IFlashLoanRouter} from "../interface/IFlashLoanRouter.sol";
-import {ICowAuthentication} from "../vendored/ICowAuthentication.sol";
 import {IERC20} from "../vendored/IERC20.sol";
 import {SafeERC20} from "../vendored/SafeERC20.sol";
 
@@ -64,14 +63,14 @@ abstract contract Borrower is IBorrower {
     /// @param amount The amount of tokens to borrow.
     /// @param callBackData Data to be sent back to this contract in the
     /// flash-loan callback without any change.
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes memory callBackData)
+    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes calldata callBackData)
         internal
         virtual;
 
     /// @notice This function is expected to be called in the concrete call-back
     /// implementation that is requested by the supported flash-loan provider.
     /// @param callBackData Data that was sent by the lender in the call back.
-    function flashLoanCallBack(bytes memory callBackData) internal {
+    function flashLoanCallBack(bytes calldata callBackData) internal {
         router.borrowerCallBack(callBackData);
     }
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import {IERC20, IFlashLoanRouter} from "src/interface/IFlashLoanRouter.sol";
+import {IFlashLoanRouter} from "src/interface/IFlashLoanRouter.sol";
 
-import {NoOpBorrower} from "./NoOp.sol";
+import {IERC20, NoOpBorrower} from "./NoOp.sol";
 
 /// @dev A minimal borrower contract that ignores all input value except for the
 /// callback data, which is sent back to the router in a callback.
