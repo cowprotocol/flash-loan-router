@@ -41,12 +41,6 @@ contract DeployAAVEBorrower is Script {
     * @param flashLoanRouter The FlashLoanRouter instance.
     * @return borrower The deployed AaveBorrower contract instance.
     * 
-    * @notice If the FlashLoanRouter contract address is generated using `CREATE2` 
-    *         with a deterministic salt (e.g., `new FlashLoanRouter{salt: Constants.SALT}(cowSettlement)`), 
-    *         the simulation of `AaveBorrower` deployment will revert with a `CREATE2` 
-    *         collision error if there is already an existing contract at the same address.
-    *         This issue is avoided by passing the address directly as an environment 
-    *         variable (`FLASHLOAN_ROUTER_ADDRESS`).
     */
     function deployAAVEBorrower(FlashLoanRouter flashLoanRouter) internal returns (AaveBorrower borrower) {
         require(address(flashLoanRouter.settlementContract()) == Constants.DEFAULT_SETTLEMENT_CONTRACT, "Settlement contract varies in flashLoanRouter");
