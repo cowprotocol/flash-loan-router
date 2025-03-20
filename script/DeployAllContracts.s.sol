@@ -8,20 +8,17 @@ import {DeployFlashLoanRouter, FlashLoanRouter} from "./single-deployment/Deploy
 
 /// @title Deploy All Contracts
 /// @author CoW DAO developers
-/// @notice A deployment contract that deploys both 
+/// @notice A deployment contract that deploys both
 /// `FlashLoanRouter` and `AaveBorrower` contracts.
 contract DeployAllContracts is DeployFlashLoanRouter, DeployAAVEBorrower {
     function run() public override(DeployFlashLoanRouter, DeployAAVEBorrower) {
         deployAll();
     }
 
-    /**
-     * @dev Deploys both `FlashLoanRouter` and `AaveBorrower` contracts.
-     * It first deploys the `FlashLoanRouter` and then passes it to `deployAAVEBorrower` to deploy the `AaveBorrower`.
-     *
-     * @return flashLoanRouter The deployed `FlashLoanRouter` contract instance.
-     * @return aaveBorrower The deployed `AaveBorrower` contract instance.
-     */
+    /// @dev Deploys both FlashLoanRouter and AaveBorrower contracts.
+    /// It first deploys the FlashLoanRouter and then passes it to deployAAVEBorrower to deploy the AaveBorrower.
+    /// @return flashLoanRouter The deployed FlashLoanRouter contract instance.
+    /// @return aaveBorrower The deployed AaveBorrower contract instance.
     function deployAll() public returns (FlashLoanRouter flashLoanRouter, AaveBorrower aaveBorrower) {
         flashLoanRouter = deployFlashLoanRouter();
         aaveBorrower = deployAAVEBorrower(flashLoanRouter);
