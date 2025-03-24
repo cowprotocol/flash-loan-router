@@ -41,9 +41,9 @@ interface IFlashLoanRouter {
 
     /// @notice The settlement contract supported by this router. This is the
     /// contract that will be called when the settlement is executed.
-    function settlementContract() external returns (ICowSettlement);
+    function settlementContract() external view returns (ICowSettlement);
 
     /// @notice The settlement authenticator contract for CoW Protocol. This
     /// contract determines who the solvers for CoW Protocol are.
-    function settlementAuthentication() external returns (ICowAuthentication);
+    function settlementAuthentication() external view returns (ICowAuthentication);
 }
