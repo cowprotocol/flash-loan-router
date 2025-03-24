@@ -9,7 +9,7 @@ import {SafeERC20} from "../vendored/SafeERC20.sol";
 
 /// @title Generic Borrower
 /// @author CoW DAO developers
-/// @notice An generic implementation of a borrower that is designed to make it
+/// @notice A generic implementation of a borrower that is designed to make it
 /// easy to support different flash-loan providers with a simpler, dedicated
 /// contract that imports this.
 /// It handles fund management through ERC-20 approvals, call authentication,
