@@ -38,14 +38,9 @@ library Bytes {
     /// @param array A bytes array.
     /// @return ref The location in memory of the content of the array.
     function memoryPointerToContent(bytes memory array) internal pure returns (uint256 ref) {
-        // Unchecked: arrays allocated by Solidity cannot cause an overflow,
-        // since a transaction would run out of gas long before reaching the
-        // length needed for an overflow. Arrays that were manually allocated
-        // through assembly may cause an overflow, but any attempt to read from
-        // or write to them would cause an out-of-gas revert.
-
         assembly ("memory-safe") {
-            ref := add(array, BYTES_LENGTH_SIZE)
+            ref := array
         }
+        ref += BYTES_LENGTH_SIZE;
     }
 }
