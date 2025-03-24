@@ -38,7 +38,7 @@ interface ICowSettlement {
     /// settlements. Any valid authenticator implements an isSolver method
     /// called by the onlySolver modifier below.
     /// @dev See <https://github.com/cowprotocol/contracts/blob/9c1984b864d0a6703a877a088be6dac56450808c/src/contracts/GPv2Settlement.sol#L28-L32>.
-    function authenticator() external returns (address);
+    function authenticator() external view returns (address);
 
     /// @notice Settle the specified orders at a clearing price. Note that it is
     /// the responsibility of the caller to ensure that all GPv2 invariants are
