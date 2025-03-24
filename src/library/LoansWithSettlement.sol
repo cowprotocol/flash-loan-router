@@ -70,7 +70,7 @@ library LoansWithSettlement {
         }
         encodedLoansWithSettlement = Bytes.allocate(encodedLength);
 
-        // Keep track of the fist yet-unwritten-to byte
+        // Keep track of the first yet-unwritten-to byte
         uint256 head = encodedLoansWithSettlement.memoryPointerToContent();
         assembly ("memory-safe") {
             mstore(head, loans.length)
