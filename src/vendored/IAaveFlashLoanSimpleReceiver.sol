@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+// Vendored from Aave DAO contracts with minor modifications:
+// - Removed view functions `ADDRESSES_PROVIDER` and `POOL` (and related import)
+// - Changed contract name to make it specific to Aave
+// - Updated imports
+// - Formatted code
+// <https://github.com/aave-dao/aave-v3-origin/blob/v3.1.0/src/core/contracts/flashloan/interfaces/IFlashLoanSimpleReceiver.sol>
+// Note: v3.1.0 points to commit e627c7428cbb358b9c84b601a009a86b4b871c08.
+
+/**
+ * @title IFlashLoanSimpleReceiver
+ * @author Aave
+ * @notice Defines the basic interface of a flashloan-receiver contract.
+ * @dev Implement this interface to develop a flashloan-compatible flashLoanReceiver contract
+ */
+interface IAaveFlashLoanSimpleReceiver {
+    /**
+     * @notice Executes an operation after receiving the flash-borrowed asset
+     * @dev Ensure that the contract can return the debt + premium, e.g., has
+     *      enough funds to repay and has approved the Pool to pull the total amount
+     * @param asset The address of the flash-borrowed asset
+     * @param amount The amount of the flash-borrowed asset
+     * @param premium The fee of the flash-borrowed asset
+     * @param initiator The address of the flashloan initiator
+     * @param params The byte-encoded params passed when initiating the flashloan
+     * @return True if the execution of the operation succeeds, false otherwise
+     */
+    function executeOperation(address asset, uint256 amount, uint256 premium, address initiator, bytes calldata params)
+        external
+        returns (bool);
+}

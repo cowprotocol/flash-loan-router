@@ -53,13 +53,12 @@ contract AaveBorrowerTest is Test {
         bytes memory callBackData = hex"1337";
         bytes memory routerCallData = abi.encodeCall(IFlashLoanRouter.borrowerCallBack, (callBackData));
         vm.expectCall(address(router), routerCallData);
-        borrower.executeOperation(new address[](0), new uint256[](0), new uint256[](0), address(0), callBackData);
+        borrower.executeOperation(address(0), 0, 0, address(0), callBackData);
     }
 
     function test_onFlashLoan_returnsTrue() external {
         bytes memory callBackData = hex"1337";
-        bool output =
-            borrower.executeOperation(new address[](0), new uint256[](0), new uint256[](0), address(0), callBackData);
+        bool output = borrower.executeOperation(address(0), 0, 0, address(0), callBackData);
         assertTrue(output);
     }
 
@@ -67,7 +66,7 @@ contract AaveBorrowerTest is Test {
         bytes memory callBackData = hex"1337";
         vm.mockCallRevert(address(router), new bytes(0), "mock revert");
         vm.expectRevert("mock revert");
-        borrower.executeOperation(new address[](0), new uint256[](0), new uint256[](0), address(0), callBackData);
+        borrower.executeOperation(address(0), 0, 0, address(0), callBackData);
     }
 
     function lenderCallDataWithDefaultParams(
@@ -77,18 +76,10 @@ contract AaveBorrowerTest is Test {
         bytes memory callBackData
     ) private pure returns (bytes memory) {
         address receiverAddress = address(_borrower);
-        address[] memory assets = new address[](1);
-        assets[0] = address(token);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
-        uint256[] memory interestRateModes = new uint256[](1);
-        interestRateModes[0] = 0;
-        address onBehalfOf = address(_borrower);
+        address asset = address(token);
         bytes memory params = callBackData;
         uint16 referralCode = 0;
 
-        return abi.encodeCall(
-            IAavePool.flashLoan, (receiverAddress, assets, amounts, interestRateModes, onBehalfOf, params, referralCode)
-        );
+        return abi.encodeCall(IAavePool.flashLoanSimple, (receiverAddress, asset, amount, params, referralCode));
     }
 }
