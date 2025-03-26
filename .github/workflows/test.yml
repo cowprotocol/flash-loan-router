@@ -28,9 +28,6 @@ jobs:
           forge --version
 
       - name: Run Forge fmt
-        # Reenable formatting checks once the following issue is resolved:
-        # https://github.com/foundry-rs/foundry/issues/9088
-        continue-on-error: true
         run: |
           forge fmt --check
         id: fmt
