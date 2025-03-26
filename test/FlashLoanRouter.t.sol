@@ -96,6 +96,13 @@ contract FlashLoanRouterTest is Test {
         caller.flashLoanAndSettle(router, new Loan.Data[](0), settlement);
     }
 
+    function test_flashLoanAndSettle_emitsSettlementEvent() external {
+        bytes memory settlement = abi.encodePacked(ICowSettlement.settle.selector);
+        vm.expectEmit(address(router));
+        emit FlashLoanRouter.Settlement(address(caller));
+        caller.flashLoanAndSettle(router, new Loan.Data[](0), settlement);
+    }
+
     function test_flashLoanAndSettle_revertsIfSettlementReverts() external {
         bytes memory settlement = abi.encodePacked(ICowSettlement.settle.selector);
         vm.mockCallRevert(address(cowProtocolMock.SETTLEMENT()), settlement, "test mock revert");
