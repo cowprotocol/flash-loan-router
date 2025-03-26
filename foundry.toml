@@ -23,3 +23,12 @@ sort_imports = true
 [profile.ci]
 deny_warnings = true
 fuzz.seed = '0'
+
+[profile.ci.fmt]
+ignore = [
+  # Foundry's fmt doesn't support the `transient` keyword on variables.
+  # We ignore all files that have that keyword in them until Foundry fixes this
+  # issue on their end.
+  # https://github.com/foundry-rs/foundry/issues/9088
+  "src/FlashLoanRouter.sol"
+]
