@@ -35,9 +35,15 @@ library Bytes {
 
     /// @notice Return the location of the content of an array in memory. Note
     /// that the array length is not part of the content.
+    /// @dev This function returns an incorrect pointer if the input array is
+    /// located to a memory slot close to the maximum value of 2²⁵⁶.
+    /// The content or length of such an array cannot be accessed without
+    /// causing an out-of-gas revert. However, such an array can still be
+    /// created using assembly. If you're using this function, you must make
+    /// sure that the bytes array you're using doesn't trigger this edge case.
     /// @param array A bytes array.
     /// @return ref The location in memory of the content of the array.
-    function memoryPointerToContent(bytes memory array) internal pure returns (uint256 ref) {
+    function unsafeMemoryPointerToContent(bytes memory array) internal pure returns (uint256 ref) {
         // Unchecked: arrays allocated by Solidity cannot cause an overflow,
         // since a transaction would run out of gas long before reaching the
         // length needed for an overflow. Arrays that were manually allocated
