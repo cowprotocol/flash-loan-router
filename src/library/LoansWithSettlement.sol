@@ -26,6 +26,15 @@ import {Loan} from "./Loan.sol";
 ///
 /// Loans are stored right to left so that it's easy to pop them in order
 /// without having to shift all remaining loans in memory.
+///
+/// This library makes strong low-level assumptions on how memory is used
+/// throughout the code for the sake of gas efficiency. You should use this
+/// library only if you're willing and able to guarantee that these
+/// optimizations don't lead to unexpected behavior.
+/// Known risks are:
+/// 1. Memory arrays with a location in memory that's close to the end of memory
+///    space can cause undefined behavior.
+/// 2. Some functions make the original memory input inaccessible.
 library LoansWithSettlement {
     using Bytes for bytes;
     using Loan for Loan.EncodedData;
@@ -37,7 +46,7 @@ library LoansWithSettlement {
     /// @param loansWithSettlement The list of loans with settlement.
     /// @return count Number of loans in the input.
     function loanCount(bytes memory loansWithSettlement) internal pure returns (uint256 count) {
-        uint256 pointer = loansWithSettlement.memoryPointerToContent();
+        uint256 pointer = loansWithSettlement.unsafeMemoryPointerToContent();
         assembly ("memory-safe") {
             count := mload(pointer)
         }
@@ -71,7 +80,7 @@ library LoansWithSettlement {
         encodedLoansWithSettlement = Bytes.allocate(encodedLength);
 
         // Keep track of the first yet-unwritten-to byte
-        uint256 head = encodedLoansWithSettlement.memoryPointerToContent();
+        uint256 head = encodedLoansWithSettlement.unsafeMemoryPointerToContent();
         assembly ("memory-safe") {
             mstore(head, loans.length)
         }
@@ -131,7 +140,7 @@ library LoansWithSettlement {
             updatedLoansWithSettlementLength = loansWithSettlement.length - Loan.ENCODED_LOAN_BYTE_SIZE;
         }
 
-        uint256 loansWithSettlementPointer = loansWithSettlement.memoryPointerToContent();
+        uint256 loansWithSettlementPointer = loansWithSettlement.unsafeMemoryPointerToContent();
         uint256 loanPointer;
         unchecked {
             // Unchecked: the pointer refers to a memory location inside
@@ -183,7 +192,7 @@ library LoansWithSettlement {
 
         // We rely on the fact that LOAN_COUNT_SIZE is 32, exactly the size
         // needed to store the length of a memory array.
-        uint256 settlementPointer = loansWithSettlement.memoryPointerToContent();
+        uint256 settlementPointer = loansWithSettlement.unsafeMemoryPointerToContent();
 
         assembly ("memory-safe") {
             mstore(settlementPointer, settlementLength)
