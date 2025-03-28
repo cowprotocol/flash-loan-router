@@ -22,7 +22,6 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @param contractAddress The address of the deployed contract.
     /// @param transactionHash The transaction hash of the deployment.
     struct Deployment {
-        string chainId; // The chain ID where the contract is deployed
         address contractAddress; // The contract's address
         bytes32 transactionHash; // The transaction hash of the deployment
     }
@@ -57,11 +56,9 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// match the expected contract addresses as defined in the JSON configuration file.
     function test_flashloan_and_borrower_deployment() public {
         // Parse the network data from the JSON configuration file
-        NetworkData memory networkData = _parseJsonData();
-
         // Extract the deployment data for FlashLoanRouter and AaveBorrower
-        Deployment memory flashloanRouterDeployment = networkData.FlashLoanRouter[0];
-        Deployment memory aaveBorrowerDeployment = networkData.AaveBorrower[0];
+        Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", 11155111);
+        Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", 11155111);
 
         // Deploy the FlashLoanRouter and AaveBorrower contracts
         FlashLoanRouter router = deployFlashLoanRouter();
@@ -81,12 +78,9 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     }
 
     function test_flashloan_and_borrower_deployment_withDifferentRouter() public {
-        // Parse the network data from the JSON configuration file
-        NetworkData memory networkData = _parseJsonData();
-
         // Extract the deployment data for FlashLoanRouter and AaveBorrower
-        Deployment memory flashloanRouterDeployment = networkData.FlashLoanRouter[0];
-        Deployment memory aaveBorrowerDeployment = networkData.AaveBorrower[0];
+        Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", 11155111);
+        Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", 11155111);
 
         // Deploy the FlashLoanRouter and AaveBorrower contracts
         FlashLoanRouter router = new FlashLoanRouter(ICowSettlement(mockSettlement));
@@ -100,16 +94,20 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @dev Internal function to read and parse the JSON configuration file, and decode it into
     /// the NetworkData struct.
     /// @return networkData The parsed and decoded network data containing contract deployment details.
-    function _parseJsonData() internal view returns (NetworkData memory networkData) {
+    function _parseJsonData(string memory contractName, uint256 chain)
+        internal
+        view
+        returns (Deployment memory networkData)
+    {
         // Read the JSON file
         string memory root = vm.projectRoot(); // Get the root directory of the project
         string memory path = string.concat(root, "/networks.json"); // Construct the path to the networks.json file
         string memory json = vm.readFile(path); // Read the contents of the JSON file
 
         // Parse the JSON data into bytes
-        bytes memory data = vm.parseJson(json); // Parse the JSON file content into bytes
+        bytes memory data = vm.parseJson(json, string.concat(".", contractName, ".", vm.toString(chain))); // Parse the JSON file content into bytes
 
         // Decode the JSON data into the NetworkData struct
-        networkData = abi.decode(data, (NetworkData));
+        networkData = abi.decode(data, (Deployment));
     }
 }
