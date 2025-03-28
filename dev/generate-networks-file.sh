@@ -4,25 +4,18 @@ set -o errexit -o pipefail -o nounset
 
 repo_root_dir="$(git rev-parse --show-toplevel)"
 
-# Iterate over each deployment JSON file in the broadcast directory
 for deployment in "$repo_root_dir/broadcast/"*"/"*"/"*".json"; do
-  # The subfolder name is the chain ID
+  # The subfolder name is the chain id
   chain_id=${deployment%/*}
   chain_id=${chain_id##*/}
 
-  # Process the deployments and format the output
+  # First, every single deployment is formatted as if it had its own networks.json
   jq --arg chainId "$chain_id" '
     .transactions[]
     | select(.transactionType == "CREATE2")
     | select(.hash != null)
-    | {(.contractName): [
-        {
-          chainId: $chainId,
-          contractAddress: .contractAddress,
-          transactionHash: .hash
-        }
-      ]}
-  ' <"$deployment"
+    | {(.contractName): {($chainId): {address: .contractAddress, transactionHash: .hash }}}
+  '  <"$deployment"
 done \
   | # Then, all these single-contract single-chain-id networks.jsons are merged. Note: in case the same contract is
     # deployed twice in the same script run, the last deployed contract takes priority.
