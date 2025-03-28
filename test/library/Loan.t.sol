@@ -29,12 +29,12 @@ contract RoundTripEncoder {
 
     function allocate() private pure returns (Loan.EncodedData) {
         bytes memory encodedData = allocateToBytes();
-        return Loan.EncodedData.wrap(encodedData.memoryPointerToContent());
+        return Loan.EncodedData.wrap(encodedData.unsafeMemoryPointerToContent());
     }
 
     function encode(Loan.Data calldata loanRequest) public pure returns (bytes memory encodedData) {
         encodedData = allocateToBytes();
-        Loan.EncodedData.wrap(encodedData.memoryPointerToContent()).store(loanRequest);
+        Loan.EncodedData.wrap(encodedData.unsafeMemoryPointerToContent()).store(loanRequest);
     }
 
     function storeAndDecode(Loan.Data calldata loanRequest) external pure returns (Loan.Data memory) {

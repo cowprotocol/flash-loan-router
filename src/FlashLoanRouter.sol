@@ -17,6 +17,12 @@ import {IERC20} from "./vendored/IERC20.sol";
 contract FlashLoanRouter is IFlashLoanRouter {
     using LoansWithSettlement for bytes;
 
+    /// @notice Event emitted to indicate that a settlement will be executed
+    /// on behalf of the indicated solver.
+    /// @param solver The address on behalf of which this contract will execute
+    /// the settlement.
+    event Settlement(address indexed solver);
+
     /// @notice Flag address signalling that the router is not currently
     /// preparing or executing a settlement. This is the case at the start or
     /// at the end of the call to `flashLoanAndSettle`.
@@ -68,6 +74,11 @@ contract FlashLoanRouter is IFlashLoanRouter {
     /// way for this contract to call itself at `flashLoanAndSettle`.
     function flashLoanAndSettle(Loan.Data[] calldata loans, bytes calldata settlement) external onlySolver {
         require(pendingBorrower == READY, "Another settlement in progress");
+        // The event is emitted before the actual settlement is executed to
+        // avoid having to carry `msg.sender` up the call stack (and related gas
+        // overhead). The contract guarantees that the call reverts if no
+        // settlement is executed.
+        emit Settlement(msg.sender);
         bytes memory loansWithSettlement = LoansWithSettlement.encode(loans, settlement);
         borrowNextLoan(loansWithSettlement);
         // The following parameter is expected to be set before the final call
@@ -81,7 +92,7 @@ contract FlashLoanRouter is IFlashLoanRouter {
 
     /// @inheritdoc IFlashLoanRouter
     /// @dev Note that the contract cannot call itself as a borrower because it
-    /// doesnt implement the expected interface.
+    /// doesn't implement the expected interface.
     function borrowerCallBack(bytes memory loansWithSettlement) external onlyPendingBorrower {
         // When the borrower is called, it's given some extra data that is
         // expected to be passed back here without changes.
