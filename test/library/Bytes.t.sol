@@ -53,7 +53,7 @@ contract BytesTest is Test {
     function test_pointsToMemoryContent() external pure {
         bytes memory array = hex"3133333333333333333333333333333333333333333333333333333333333333333333333333333337";
         uint256 content;
-        uint256 pointer = array.memoryPointerToContent();
+        uint256 pointer = array.unsafeMemoryPointerToContent();
         assembly ("memory-safe") {
             content := mload(pointer)
         }
