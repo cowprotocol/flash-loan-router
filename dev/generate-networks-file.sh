@@ -25,4 +25,4 @@ for deployment in "$repo_root_dir/broadcast/"*"/"*"/"*".json"; do
   ' <"$deployment"
 done \
   | # Merge all the deployments from different contract files
-    jq --sort-keys --null-input 'reduce inputs as $item ({}; . *= $item)' > "$repo_root_dir/networks.json"  # Save it to networks.json
+    jq --sort-keys --null-input 'reduce inputs as $item ({}; . *= $item)'
