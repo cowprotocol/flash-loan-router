@@ -35,6 +35,8 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     address constant mockSettlement = 0x9008D19f58AAbD9eD0D60971565AA8510560ab41;
     /// @dev Authenticator contract address to mock
     address constant mockAuthenticator = 0x2c4c28DDBdAc9C5E7055b4C863b72eA0149D8aFE;
+    /// @dev Chain ids for official contact deployments
+    uint256[] private CHAIN_IDS = [1, 100, 11155111, 42161, 8453];
 
     /// @dev Override function from DeployFlashLoanRouter and DeployAAVEBorrower to run deployments.
     function run() public override(DeployFlashLoanRouter, DeployAAVEBorrower) {}
@@ -49,10 +51,12 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @dev Test function to verify that the deployed FlashLoanRouter and AaveBorrower contracts
     /// match the expected contract addresses as defined in the JSON configuration file.
     function test_flashloan_and_borrower_deployment() public {
+        (uint256 flashLoanRouterChainId, uint256 aaveBorrowerChainId) = test_contract_addresses_are_the_same_across_chains();
+
         // Parse the network data from the JSON configuration file and
         // extract the deployment data for FlashLoanRouter and AaveBorrower
-        Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", 11155111);
-        Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", 11155111);
+        Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", flashLoanRouterChainId);
+        Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", aaveBorrowerChainId);
 
         // Deploy the FlashLoanRouter and AaveBorrower contracts using
         // the deployment contracts
@@ -72,21 +76,36 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         );
     }
 
+    function test_contract_addresses_are_the_same_across_chains() public returns(uint256, uint256) {
+        (bool flashLoanRouterAddressAreTheSame, uint256 flashLoanRouterChainId) = _parseContractAddresses("FlashLoanRouter");
+        (bool aaveBorrowerAddressAreTheSame, uint256 aaveBorrowerChainId) = _parseContractAddresses("AaveBorrower");
+
+        assertTrue(flashLoanRouterAddressAreTheSame, "FlashLoanRouter contract address should all be the same");
+        assertTrue(aaveBorrowerAddressAreTheSame, "AAVEBorrower contract address should all be the same");
+        assertTrue(flashLoanRouterChainId != 0, "Invalid chain id returned for FlashLoanRouter");
+        assertTrue(aaveBorrowerChainId !=  0, "Invalid chain id returned for AAVEBorrower");
+
+        return (flashLoanRouterChainId, aaveBorrowerChainId);
+    }
+
     /// @dev Test function to verify that the deployment with a different FlashLoanRouter
     /// causes the address equality checks to fail as it will alter the bytecode for
     /// AaveBorrower contract too
     function test_router_mismatch_changes_deployment() public {
+        (uint256 flashLoanRouterChainId, uint256 aaveBorrowerChainId) = test_contract_addresses_are_the_same_across_chains();
+
         // Extract the deployment data for FlashLoanRouter and AaveBorrower
-        Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", 11155111);
-        Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", 11155111);
+        Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", flashLoanRouterChainId);
+        Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", aaveBorrowerChainId);
 
         // Deploy the FlashLoanRouter and AaveBorrower contracts
         FlashLoanRouter router = new FlashLoanRouter(ICowSettlement(mockSettlement));
         AaveBorrower aaveBorrower = deployAAVEBorrower(router);
 
-        // Verify that the deployed addresses match the expected addresses
-        assertFalse(address(router) == flashloanRouterDeployment.contractAddress);
-        assertFalse(address(aaveBorrower) == aaveBorrowerDeployment.contractAddress);
+        // Verify that the deployed addresses should not match the expected addresses when
+        // FlashLoanRouter mismatches
+        assertNotEq(address(router), flashloanRouterDeployment.contractAddress, "FlashLoanRouter deployment should be different");
+        assertNotEq(address(aaveBorrower), aaveBorrowerDeployment.contractAddress, "AaveBorrower deployment should be different");
     }
 
     /// @dev Internal function to read and parse the JSON configuration file, and decode it into
@@ -96,6 +115,50 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         internal
         returns (Deployment memory deploymentData)
     {
+        // Get the contents of the JSON file
+        string memory json = getJsonFileContents();
+
+        // Parse the JSON data into bytes
+        bytes memory data = vm.parseJson(json, string.concat(".", contractName, ".", vm.toString(chain)));
+
+        // Decode the JSON data into the deploymentData struct
+        deploymentData = abi.decode(data, (Deployment));
+    }
+
+    function _parseContractAddresses(string memory contractName)
+        internal
+        returns (bool isSameAcrossAllChains, uint256 chosenChainId)
+    {
+        address firstAddress;
+
+        // Get the contents of the JSON file
+        string memory json = getJsonFileContents();
+
+        for (uint256 i = 0; i < CHAIN_IDS.length; i++) {
+            string memory jsonPath = string.concat(".", contractName, ".", vm.toString(CHAIN_IDS[i]));
+
+            if (!vm.keyExists(json, jsonPath)) continue;
+
+            bytes memory data = vm.parseJson(json, jsonPath);
+            Deployment memory deploymentData = abi.decode(data, (Deployment));
+
+            if (firstAddress == address(0)) {
+                firstAddress = deploymentData.contractAddress;
+                chosenChainId = CHAIN_IDS[i];
+                isSameAcrossAllChains = true;
+            } else if (deploymentData.contractAddress != firstAddress) {
+                isSameAcrossAllChains = false;
+                break;
+            }
+        }
+
+        if (firstAddress == address(0)) {
+            console.log("Skipping tests: No valid chain IDs found for", contractName);
+            vm.skip(true);
+        }
+    }
+
+    function getJsonFileContents() internal returns (string memory json) {
         // Get the root directory of the project
         string memory root = vm.projectRoot();
         // Construct the path to the networks.json file
@@ -109,12 +172,6 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         }
 
         // Read the contents of the JSON file
-        string memory json = vm.readFile(path);
-
-        // Parse the JSON data into bytes
-        bytes memory data = vm.parseJson(json, string.concat(".", contractName, ".", vm.toString(chain)));
-
-        // Decode the JSON data into the deploymentData struct
-        deploymentData = abi.decode(data, (Deployment));
+        json = vm.readFile(path);
     }
 }
