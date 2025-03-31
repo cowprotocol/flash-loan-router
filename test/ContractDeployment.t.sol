@@ -27,9 +27,9 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     }
 
     /// @dev Mock instance of FlashLoanRouter
-    FlashLoanRouter private mockRouter; 
+    FlashLoanRouter private mockRouter;
     /// @dev Mock instance of CowProtocol
-    CowProtocolMock private cowProtocolMock; 
+    CowProtocolMock private cowProtocolMock;
 
     /// @dev Settlement contract address to mock
     address constant mockSettlement = 0x9008D19f58AAbD9eD0D60971565AA8510560ab41;
@@ -54,7 +54,7 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", 11155111);
         Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", 11155111);
 
-        // Deploy the FlashLoanRouter and AaveBorrower contracts using 
+        // Deploy the FlashLoanRouter and AaveBorrower contracts using
         // the deployment contracts
         FlashLoanRouter router = deployFlashLoanRouter();
         AaveBorrower aaveBorrower = deployAAVEBorrower(router);
@@ -97,19 +97,19 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         returns (Deployment memory deploymentData)
     {
         // Get the root directory of the project
-        string memory root = vm.projectRoot(); 
+        string memory root = vm.projectRoot();
         // Construct the path to the networks.json file
-        string memory path = string.concat(root, "/networks.json"); 
+        string memory path = string.concat(root, "/networks.json");
 
         // Check if the file exists and
         // skip the test execution if the file does not exist
         if (!vm.exists(path)) {
             console.log("Skipping test: networks.json file not found.");
-            vm.skip(true); 
+            vm.skip(true);
         }
 
         // Read the contents of the JSON file
-        string memory json = vm.readFile(path); 
+        string memory json = vm.readFile(path);
 
         // Parse the JSON data into bytes
         bytes memory data = vm.parseJson(json, string.concat(".", contractName, ".", vm.toString(chain)));
