@@ -8,6 +8,7 @@ out/
 /broadcast/**/dry-run/
 /broadcast/**/run-latest.json
 
+.DS_Store
 
 # Docs
 docs/
