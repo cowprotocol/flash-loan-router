@@ -76,6 +76,10 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         );
     }
 
+    /// @notice Checks if the contract addresses are the same across all supported chains.
+    /// @dev Parses the contract addresses from the `networks.json` file and ensures they match across chains.
+    /// @return flashLoanRouterChainId The chain ID used for deploying the FlashLoanRouter.
+    /// @return aaveBorrowerChainId The chain ID used for deploying the AaveBorrower.
     function test_contract_addresses_are_the_same_across_chains() public returns(uint256, uint256) {
         (bool flashLoanRouterAddressAreTheSame, uint256 flashLoanRouterChainId) = _parseContractAddresses("FlashLoanRouter");
         (bool aaveBorrowerAddressAreTheSame, uint256 aaveBorrowerChainId) = _parseContractAddresses("AaveBorrower");
@@ -125,6 +129,11 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         deploymentData = abi.decode(data, (Deployment));
     }
 
+    /// @notice Parses the contract addresses from `networks.json` for the given contract name.
+    /// @dev Loops through the defined chain IDs and compares the contract address across chains.
+    /// @param contractName The name of the contract whose addresses need to be checked.
+    /// @return isSameAcrossAllChains A boolean indicating whether the contract addresses are the same across all chains.
+    /// @return chosenChainId The chain ID that was chosen for deployment based on matching contract address.
     function _parseContractAddresses(string memory contractName)
         internal
         returns (bool isSameAcrossAllChains, uint256 chosenChainId)
@@ -158,6 +167,10 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         }
     }
 
+    /// @notice Reads the contents of the `networks.json` file.
+    /// @dev This function checks if the `networks.json` file exists and reads its contents. 
+    ///      If the file is missing, it skips the test execution.
+    /// @return json The contents of the `networks.json` file as a string.
     function getJsonFileContents() internal returns (string memory json) {
         // Get the root directory of the project
         string memory root = vm.projectRoot();
