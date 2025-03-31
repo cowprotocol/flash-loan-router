@@ -51,7 +51,8 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @dev Test function to verify that the deployed FlashLoanRouter and AaveBorrower contracts
     /// match the expected contract addresses as defined in the JSON configuration file.
     function test_flashloan_and_borrower_deployment() public {
-        (uint256 flashLoanRouterChainId, uint256 aaveBorrowerChainId) = test_contract_addresses_are_the_same_across_chains();
+        (uint256 flashLoanRouterChainId, uint256 aaveBorrowerChainId) =
+            test_contract_addresses_are_the_same_across_chains();
 
         // Parse the network data from the JSON configuration file and
         // extract the deployment data for FlashLoanRouter and AaveBorrower
@@ -80,14 +81,15 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @dev Parses the contract addresses from the `networks.json` file and ensures they match across chains.
     /// @return flashLoanRouterChainId The chain ID used for deploying the FlashLoanRouter.
     /// @return aaveBorrowerChainId The chain ID used for deploying the AaveBorrower.
-    function test_contract_addresses_are_the_same_across_chains() public returns(uint256, uint256) {
-        (bool flashLoanRouterAddressAreTheSame, uint256 flashLoanRouterChainId) = _parseContractAddresses("FlashLoanRouter");
+    function test_contract_addresses_are_the_same_across_chains() public returns (uint256, uint256) {
+        (bool flashLoanRouterAddressAreTheSame, uint256 flashLoanRouterChainId) =
+            _parseContractAddresses("FlashLoanRouter");
         (bool aaveBorrowerAddressAreTheSame, uint256 aaveBorrowerChainId) = _parseContractAddresses("AaveBorrower");
 
         assertTrue(flashLoanRouterAddressAreTheSame, "FlashLoanRouter contract address should all be the same");
         assertTrue(aaveBorrowerAddressAreTheSame, "AAVEBorrower contract address should all be the same");
         assertTrue(flashLoanRouterChainId != 0, "Invalid chain id returned for FlashLoanRouter");
-        assertTrue(aaveBorrowerChainId !=  0, "Invalid chain id returned for AAVEBorrower");
+        assertTrue(aaveBorrowerChainId != 0, "Invalid chain id returned for AAVEBorrower");
 
         return (flashLoanRouterChainId, aaveBorrowerChainId);
     }
@@ -96,7 +98,8 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// causes the address equality checks to fail as it will alter the bytecode for
     /// AaveBorrower contract too
     function test_router_mismatch_changes_deployment() public {
-        (uint256 flashLoanRouterChainId, uint256 aaveBorrowerChainId) = test_contract_addresses_are_the_same_across_chains();
+        (uint256 flashLoanRouterChainId, uint256 aaveBorrowerChainId) =
+            test_contract_addresses_are_the_same_across_chains();
 
         // Extract the deployment data for FlashLoanRouter and AaveBorrower
         Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", flashLoanRouterChainId);
@@ -108,8 +111,12 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
 
         // Verify that the deployed addresses should not match the expected addresses when
         // FlashLoanRouter mismatches
-        assertNotEq(address(router), flashloanRouterDeployment.contractAddress, "FlashLoanRouter deployment should be different");
-        assertNotEq(address(aaveBorrower), aaveBorrowerDeployment.contractAddress, "AaveBorrower deployment should be different");
+        assertNotEq(
+            address(router), flashloanRouterDeployment.contractAddress, "FlashLoanRouter deployment should be different"
+        );
+        assertNotEq(
+            address(aaveBorrower), aaveBorrowerDeployment.contractAddress, "AaveBorrower deployment should be different"
+        );
     }
 
     /// @dev Internal function to read and parse the JSON configuration file, and decode it into
@@ -168,7 +175,7 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     }
 
     /// @notice Reads the contents of the `networks.json` file.
-    /// @dev This function checks if the `networks.json` file exists and reads its contents. 
+    /// @dev This function checks if the `networks.json` file exists and reads its contents.
     ///      If the file is missing, it skips the test execution.
     /// @return json The contents of the `networks.json` file as a string.
     function getJsonFileContents() internal returns (string memory json) {
