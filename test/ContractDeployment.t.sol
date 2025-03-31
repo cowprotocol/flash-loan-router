@@ -72,7 +72,7 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
         );
     }
 
-    /// @dev Test function to verify that the deploying with a different FlashLoanRouter
+    /// @dev Test function to verify that the deployment with a different FlashLoanRouter
     /// causes the address equality checks to fail as it will alter the bytecode for
     /// AaveBorrower contract too
     function test_router_mismatch_changes_deployment() public {
