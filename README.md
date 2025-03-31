@@ -176,3 +176,5 @@ The deployment addresses file is generated with:
 ```shell
 bash dev/generate-networks-file.sh > networks.json
 ```
+
+The [ContractDeployment](test/ContractDeployment.t.sol) test verifies that the contract addresses across all supported chains for each contract name is the same. It depends on the availability of the [networks.json](networks.json) file or skips the tests if the file is not available. The supported chain ids (1, 100, 11155111, 42161, 8453) are defined in the test file. 
