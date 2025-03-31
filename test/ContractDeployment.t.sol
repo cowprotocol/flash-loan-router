@@ -22,31 +22,25 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @param contractAddress The address of the deployed contract.
     /// @param transactionHash The transaction hash of the deployment.
     struct Deployment {
-        address contractAddress; // The contract's address
-        bytes32 transactionHash; // The transaction hash of the deployment
+        address contractAddress;
+        bytes32 transactionHash;
     }
 
-    /// @dev A struct holding the deployments of different contracts such as AaveBorrower
-    /// and FlashLoanRouter. Each contract type has an array of deployments for different network configurations.
-    /// @param AaveBorrower An array of AaveBorrower contract deployments.
-    /// @param FlashLoanRouter An array of FlashLoanRouter contract deployments.
-    struct NetworkData {
-        Deployment[] AaveBorrower; // Array of AaveBorrower contract deployments
-        Deployment[] FlashLoanRouter; // Array of FlashLoanRouter contract deployments
-    }
+    /// @dev Mock instance of FlashLoanRouter
+    FlashLoanRouter private mockRouter; 
+    /// @dev Mock instance of CowProtocol
+    CowProtocolMock private cowProtocolMock; 
 
-    FlashLoanRouter private mockRouter; // Mock instance of FlashLoanRouter
-    CowProtocolMock private cowProtocolMock; // Mock instance of CowProtocol
-
-    address constant mockSettlement = 0x9008D19f58AAbD9eD0D60971565AA8510560ab41; // Settlement contract address to mock
-    address constant mockAuthenticator = 0x2c4c28DDBdAc9C5E7055b4C863b72eA0149D8aFE; // Authenticator contract address to mock
+    /// @dev Settlement contract address to mock
+    address constant mockSettlement = 0x9008D19f58AAbD9eD0D60971565AA8510560ab41;
+    /// @dev Authenticator contract address to mock
+    address constant mockAuthenticator = 0x2c4c28DDBdAc9C5E7055b4C863b72eA0149D8aFE;
 
     /// @dev Override function from DeployFlashLoanRouter and DeployAAVEBorrower to run deployments.
     function run() public override(DeployFlashLoanRouter, DeployAAVEBorrower) {}
 
     /// @dev Set up mock instances of the CowProtocol for testing.
     /// This function is called before each test function to initialize required state.
-
     function setUp() external {
         // Initialize the CowProtocolMock with deployed contract addresses
         cowProtocolMock = new CowProtocolMock(vm, mockSettlement, mockAuthenticator);
@@ -55,16 +49,17 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @dev Test function to verify that the deployed FlashLoanRouter and AaveBorrower contracts
     /// match the expected contract addresses as defined in the JSON configuration file.
     function test_flashloan_and_borrower_deployment() public {
-        // Parse the network data from the JSON configuration file
-        // Extract the deployment data for FlashLoanRouter and AaveBorrower
+        // Parse the network data from the JSON configuration file and
+        // extract the deployment data for FlashLoanRouter and AaveBorrower
         Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", 11155111);
         Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", 11155111);
 
-        // Deploy the FlashLoanRouter and AaveBorrower contracts
+        // Deploy the FlashLoanRouter and AaveBorrower contracts using 
+        // the deployment contracts
         FlashLoanRouter router = deployFlashLoanRouter();
         AaveBorrower aaveBorrower = deployAAVEBorrower(router);
 
-        // Verify that the deployed addresses match the expected addresses
+        // Verify that the deployed contract addresses match the expected addresses
         assertEq(
             address(router),
             flashloanRouterDeployment.contractAddress,
@@ -95,22 +90,24 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     }
 
     /// @dev Internal function to read and parse the JSON configuration file, and decode it into
-    /// the NetworkData struct.
-    /// @return networkData The parsed and decoded network data containing contract deployment details.
+    /// the Deployment struct.
+    /// @return deploymentData The parsed and decoded network data containing contract deployment details.
     function _parseJsonData(string memory contractName, uint256 chain)
         internal
         view
-        returns (Deployment memory networkData)
+        returns (Deployment memory deploymentData)
     {
-        // Read the JSON file
-        string memory root = vm.projectRoot(); // Get the root directory of the project
-        string memory path = string.concat(root, "/networks.json"); // Construct the path to the networks.json file
-        string memory json = vm.readFile(path); // Read the contents of the JSON file
+        // Get the root directory of the project
+        string memory root = vm.projectRoot(); 
+        // Construct the path to the networks.json file
+        string memory path = string.concat(root, "/networks.json"); 
+        // Read the contents of the JSON file
+        string memory json = vm.readFile(path); 
 
         // Parse the JSON data into bytes
-        bytes memory data = vm.parseJson(json, string.concat(".", contractName, ".", vm.toString(chain))); // Parse the JSON file content into bytes
+        bytes memory data = vm.parseJson(json, string.concat(".", contractName, ".", vm.toString(chain)));
 
-        // Decode the JSON data into the NetworkData struct
-        networkData = abi.decode(data, (Deployment));
+        // Decode the JSON data into the deploymentData struct
+        deploymentData = abi.decode(data, (Deployment));
     }
 }
