@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {IBorrower, ICowSettlement, IFlashLoanRouter} from "src/FlashLoanRouter.sol";
 
 import {Constants} from "../script/libraries/Constants.sol";
@@ -75,7 +75,7 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @dev Test function to verify that the deploying with a different FlashLoanRouter
     /// causes the address equality checks to fail as it will alter the bytecode for
     /// AaveBorrower contract too
-    function test_flashloan_and_borrower_deployment_withDifferentRouter() public {
+    function test_router_mismatch_changes_deployment() public {
         // Extract the deployment data for FlashLoanRouter and AaveBorrower
         Deployment memory flashloanRouterDeployment = _parseJsonData("FlashLoanRouter", 11155111);
         Deployment memory aaveBorrowerDeployment = _parseJsonData("AaveBorrower", 11155111);
@@ -94,13 +94,20 @@ contract ContractDeploymentTest is Test, DeployFlashLoanRouter, DeployAAVEBorrow
     /// @return deploymentData The parsed and decoded network data containing contract deployment details.
     function _parseJsonData(string memory contractName, uint256 chain)
         internal
-        view
         returns (Deployment memory deploymentData)
     {
         // Get the root directory of the project
         string memory root = vm.projectRoot(); 
         // Construct the path to the networks.json file
         string memory path = string.concat(root, "/networks.json"); 
+
+        // Check if the file exists and
+        // skip the test execution if the file does not exist
+        if (!vm.exists(path)) {
+            console.log("Skipping test: networks.json file not found.");
+            vm.skip(true); 
+        }
+
         // Read the contents of the JSON file
         string memory json = vm.readFile(path); 
 
