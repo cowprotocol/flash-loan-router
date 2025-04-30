@@ -156,6 +156,17 @@ forge script script/DeployAllContracts.s.sol:DeployAllContracts --rpc-url $ETH_R
 
 For Etherscan verification, ensure that the `ETHERSCAN_API_KEY` environment variable is set and add the `--verify` flag to the `forge script` deployment commands.
 
+Alternatively, you can verify the contract after the deployment:
+```shell
+# Verify FlashLoanRouter
+forge verify-contract 0xf8f1e67f0eb7983f8eaf47c28489e6a6ee2ff398 src/FlashLoanRouter.sol:FlashLoanRouter --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0x9008D19f58AAbD9eD0D60971565AA8510560ab41)
+
+# Verify ERC3156Borrower
+forge verify-contract 0xfbbf4cec7d59ac57f9a8f2e5faecf4c7c5303e85 src/ERC3156Borrower.sol:ERC3156Borrower --chain-id 1 --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0xf8f1e67f0eb7983f8eaf47c28489e6a6ee2ff398)
+
+# Verify AaveBorrower
+forge verify-contract 0x6c96e214d7c907d1784703139e6ac216ee5fba9b src/AaveBorrower.sol:AaveBorrower --chain-id 1 --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0xf8f1e67f0eb7983f8eaf47c28489e6a6ee2ff398)
+```
 
 #### Deploy a Single Contract
 
