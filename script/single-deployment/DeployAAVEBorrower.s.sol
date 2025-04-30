@@ -7,7 +7,7 @@ import {AaveBorrower} from "src/AaveBorrower.sol";
 import {FlashLoanRouter} from "src/FlashLoanRouter.sol";
 
 import {Constants} from "../libraries/Constants.sol";
-import {assertFlashLoanRouter} from "../libraries/Asserts.sol";
+import {Asserts} from "../libraries/Asserts.sol";
 
 /// @title Deploy Aave Borrower
 /// @author CoW DAO developers
@@ -42,7 +42,7 @@ contract DeployAAVEBorrower is Script {
     function deployAAVEBorrower(
         FlashLoanRouter flashLoanRouter
     ) internal returns (AaveBorrower borrower) {
-        assertFlashLoanRouter(flashLoanRouter);
+        Asserts.assertFlashLoanRouter(flashLoanRouter);
 
         vm.broadcast();
         borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);

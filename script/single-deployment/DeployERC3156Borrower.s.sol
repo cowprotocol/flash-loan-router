@@ -7,7 +7,7 @@ import {ERC3156Borrower} from "src/ERC3156Borrower.sol";
 import {FlashLoanRouter} from "src/FlashLoanRouter.sol";
 
 import {Constants} from "../libraries/Constants.sol";
-import {assertFlashLoanRouter} from "../libraries/Asserts.sol";
+import {Asserts} from "../libraries/Asserts.sol";
 
 /// @title Deploy ERC3156 Borrower
 /// @author CoW DAO developers
@@ -42,7 +42,7 @@ contract DeployERC3156Borrower is Script {
     function deployERC3156Borrower(
         FlashLoanRouter flashLoanRouter
     ) internal returns (ERC3156Borrower borrower) {
-        assertFlashLoanRouter(flashLoanRouter);
+        Asserts.assertFlashLoanRouter(flashLoanRouter);
 
         vm.broadcast();
         borrower = new ERC3156Borrower{salt: Constants.SALT}(flashLoanRouter);
