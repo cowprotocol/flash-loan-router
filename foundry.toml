@@ -5,6 +5,9 @@ libs = ["lib"]
 
 # Compiler settings
 solc = "0.8.28"
+evm_version = "cancun"
+bytecode_hash = "none"
+cbor_metadata = false
 optimizer = true
 optimizer_runs = 1000000
 
@@ -30,5 +33,5 @@ ignore = [
   # We ignore all files that have that keyword in them until Foundry fixes this
   # issue on their end.
   # https://github.com/foundry-rs/foundry/issues/9088
-  "src/FlashLoanRouter.sol"
+  "src/FlashLoanRouter.sol",
 ]
