@@ -6,8 +6,6 @@ libs = ["lib"]
 # Compiler settings
 solc = "0.8.28"
 evm_version = "cancun"
-bytecode_hash = "none"
-cbor_metadata = false
 optimizer = true
 optimizer_runs = 1000000
 
