@@ -2,6 +2,15 @@
 
 A smart contract that allows CoW-Protocol solvers to execute a settlement with the ability to use funds from one or more flash loans.
 
+# Ethereum addresses
+
+- FlashLoanRouter: `0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69`
+- AaveBorrower: `0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A`
+- ERC3156Borrower: `0x47d71b4B3336AB2729436186C216955F3C27cD04`
+
+For detailed see [networks.json](./networks.json)
+
+
 ## Design
 
 The flash-loan router lets a solver specify a list of flash-loan requests as well as a settlement to be executed with the proceeds of those loans.
