@@ -58,10 +58,16 @@ contract DeployAAVEBorrower is Script {
         if (expectedAddress.code.length == 0) {
             vm.broadcast();
             borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
-            console.log("AaveBorrower deployed at:", address(borrower));
+            console.log(
+                "AaveBorrower has been deployed at:",
+                address(borrower)
+            );
         } else {
             borrower = AaveBorrower(expectedAddress);
-            console.log("AaveBorrower already deployed at:", address(borrower));
+            console.log(
+                "AaveBorrower was already deployed at:",
+                address(borrower)
+            );
         }
     }
 }
