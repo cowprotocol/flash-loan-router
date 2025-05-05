@@ -26,6 +26,10 @@
       "address": "0x47d71b4b3336ab2729436186c216955f3c27cd04",
       "transactionHash": "0x04512fc221383219a2be4f82e90295c3b4df253e51d1f72a3a34425668aa87c4"
     },
+    "42161": {
+      "address": "0x47d71b4b3336ab2729436186c216955f3c27cd04",
+      "transactionHash": "0xb5a33ff4b3f20cd8ba2d40c3162956768ce6c55e6ace86a2e6b72dcd63a18289"
+    },
     "8453": {
       "address": "0x47d71b4b3336ab2729436186c216955f3c27cd04",
       "transactionHash": "0xf5d4411eb73e464e8c12c9df9c5917d8302a2ad5a4de98cea1a8cddc61be3fa6"
