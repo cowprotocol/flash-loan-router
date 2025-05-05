@@ -8,6 +8,10 @@
       "address": "0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A",
       "transactionHash": "0xdb409e72729cb6de0217edb2fbce92e6e0be4afa5a52599064315edc843e279a"
     },
+    "42161": {
+      "address": "0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A",
+      "transactionHash": "0x50df6f9885e579df8111333807171aac19bf2b0365c4fb169e82be9de005b62d"
+    },
     "8453": {
       "address": "0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A",
       "transactionHash": "0x987f2a33606cf40763d3af0fa31eb230164979a353710a5ae343d0ddf74f6409"
@@ -35,6 +39,10 @@
     "11155111": {
       "address": "0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69",
       "transactionHash": "0x55bb83060fd3448e3e559425d99a435cbce335070c8892dadb35d2d662683a06"
+    },
+    "42161": {
+      "address": "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
+      "transactionHash": "0x53afc6022d2ef57f53497d72f07e71a55b7e50d9800742d81b1b9273a76c4c5a"
     },
     "8453": {
       "address": "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
