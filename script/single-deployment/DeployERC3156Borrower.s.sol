@@ -63,11 +63,14 @@ contract DeployERC3156Borrower is Script {
             borrower = new ERC3156Borrower{salt: Constants.SALT}(
                 flashLoanRouter
             );
-            console.log("ERC3156Borrower deployed at:", address(borrower));
+            console.log(
+                "ERC3156Borrower has been deployed at:",
+                address(borrower)
+            );
         } else {
             borrower = ERC3156Borrower(expectedAddress);
             console.log(
-                "ERC3156Borrower already deployed at:",
+                "ERC3156Borrower was already deployed at:",
                 address(borrower)
             );
         }

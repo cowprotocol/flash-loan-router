@@ -57,11 +57,14 @@ contract DeployFlashLoanRouter is Script {
         if (expectedAddress.code.length == 0) {
             vm.broadcast();
             router = new FlashLoanRouter{salt: Constants.SALT}(cowSettlement);
-            console.log("FlashLoanRouter deployed at:", address(router));
+            console.log(
+                "FlashLoanRouter has been deployed at:",
+                address(router)
+            );
         } else {
             router = FlashLoanRouter(expectedAddress);
             console.log(
-                "FlashLoanRouter already deployed at:",
+                "FlashLoanRouter was already deployed at:",
                 address(router)
             );
         }
