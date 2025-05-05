@@ -44,9 +44,32 @@ contract DeployERC3156Borrower is Script {
     ) internal returns (ERC3156Borrower borrower) {
         Asserts.assertFlashLoanRouter(flashLoanRouter);
 
-        vm.broadcast();
         borrower = new ERC3156Borrower{salt: Constants.SALT}(flashLoanRouter);
 
-        console.log("ERC3156Borrower deployed at:", address(borrower));
+        // Calculate the CREATE2 address first
+        address expectedAddress = vm.computeCreate2Address(
+            Constants.SALT,
+            keccak256(
+                abi.encodePacked(
+                    type(ERC3156Borrower).creationCode,
+                    abi.encode(flashLoanRouter)
+                )
+            )
+        );
+
+        // Only deploy if no code exists at that address
+        if (expectedAddress.code.length == 0) {
+            vm.broadcast();
+            borrower = new ERC3156Borrower{salt: Constants.SALT}(
+                flashLoanRouter
+            );
+            console.log("ERC3156Borrower deployed at:", address(borrower));
+        } else {
+            borrower = ERC3156Borrower(expectedAddress);
+            console.log(
+                "ERC3156Borrower already deployed at:",
+                address(borrower)
+            );
+        }
     }
 }

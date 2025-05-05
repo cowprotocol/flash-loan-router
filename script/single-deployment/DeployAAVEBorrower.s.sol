@@ -44,9 +44,24 @@ contract DeployAAVEBorrower is Script {
     ) internal returns (AaveBorrower borrower) {
         Asserts.assertFlashLoanRouter(flashLoanRouter);
 
-        vm.broadcast();
-        borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
+        address expectedAddress = vm.computeCreate2Address(
+            Constants.SALT,
+            keccak256(
+                abi.encodePacked(
+                    type(AaveBorrower).creationCode,
+                    abi.encode(flashLoanRouter)
+                )
+            )
+        );
 
-        console.log("AaveBorrower deployed at:", address(borrower));
+        // Only deploy if no code exists at that address
+        if (expectedAddress.code.length == 0) {
+            vm.broadcast();
+            borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
+            console.log("AaveBorrower deployed at:", address(borrower));
+        } else {
+            borrower = AaveBorrower(expectedAddress);
+            console.log("AaveBorrower already deployed at:", address(borrower));
+        }
     }
 }
