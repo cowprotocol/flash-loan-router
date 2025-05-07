@@ -10,12 +10,9 @@ import {FlashLoanRouter} from "src/FlashLoanRouter.sol";
 library Asserts {
     /// @notice Asserts that the settlement contract in the flashLoanRouter is the default settlement contract.
     /// @param flashLoanRouter The flashLoanRouter to assert.
-    function assertFlashLoanRouter(
-        FlashLoanRouter flashLoanRouter
-    ) internal view {
+    function assertFlashLoanRouter(FlashLoanRouter flashLoanRouter) internal view {
         require(
-            address(flashLoanRouter.settlementContract()) ==
-                Constants.DEFAULT_SETTLEMENT_CONTRACT,
+            address(flashLoanRouter.settlementContract()) == Constants.DEFAULT_SETTLEMENT_CONTRACT,
             "Settlement contract varies in flashLoanRouter"
         );
     }
