@@ -6,8 +6,8 @@ import {Script, console} from "forge-std/Script.sol";
 import {AaveBorrower} from "src/AaveBorrower.sol";
 import {FlashLoanRouter} from "src/FlashLoanRouter.sol";
 
-import {Constants} from "../libraries/Constants.sol";
 import {Asserts} from "../libraries/Asserts.sol";
+import {Constants} from "../libraries/Constants.sol";
 
 /// @title Deploy Aave Borrower
 /// @author CoW DAO developers
@@ -20,9 +20,7 @@ contract DeployAAVEBorrower is Script {
     /// the `FlashLoanRouter` address from the environment variable
     /// `FLASHLOAN_ROUTER_ADDRESS`.
     function run() public virtual {
-        FlashLoanRouter flashLoanRouter = FlashLoanRouter(
-            vm.envAddress("FLASHLOAN_ROUTER_ADDRESS")
-        );
+        FlashLoanRouter flashLoanRouter = FlashLoanRouter(vm.envAddress("FLASHLOAN_ROUTER_ADDRESS"));
         deployAAVEBorrower(flashLoanRouter);
     }
 
@@ -39,35 +37,21 @@ contract DeployAAVEBorrower is Script {
     ///
     /// @param flashLoanRouter The FlashLoanRouter instance.
     /// @return borrower The deployed AaveBorrower contract instance.
-    function deployAAVEBorrower(
-        FlashLoanRouter flashLoanRouter
-    ) internal returns (AaveBorrower borrower) {
+    function deployAAVEBorrower(FlashLoanRouter flashLoanRouter) internal returns (AaveBorrower borrower) {
         Asserts.assertFlashLoanRouter(flashLoanRouter);
 
         address expectedAddress = vm.computeCreate2Address(
-            Constants.SALT,
-            keccak256(
-                abi.encodePacked(
-                    type(AaveBorrower).creationCode,
-                    abi.encode(flashLoanRouter)
-                )
-            )
+            Constants.SALT, keccak256(abi.encodePacked(type(AaveBorrower).creationCode, abi.encode(flashLoanRouter)))
         );
 
         // Only deploy if no code exists at that address
         if (expectedAddress.code.length == 0) {
             vm.broadcast();
             borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
-            console.log(
-                "AaveBorrower has been deployed at:",
-                address(borrower)
-            );
+            console.log("AaveBorrower has been deployed at:", address(borrower));
         } else {
             borrower = AaveBorrower(expectedAddress);
-            console.log(
-                "AaveBorrower was already deployed at:",
-                address(borrower)
-            );
+            console.log("AaveBorrower was already deployed at:", address(borrower));
         }
     }
 }

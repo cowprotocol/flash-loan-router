@@ -38,35 +38,21 @@ contract DeployFlashLoanRouter is Script {
     ///         This issue is avoided by passing the address directly as an environment
     ///         variable (`FLASHLOAN_ROUTER_ADDRESS`).
     function deployFlashLoanRouter() internal returns (FlashLoanRouter router) {
-        ICowSettlement cowSettlement = ICowSettlement(
-            Constants.DEFAULT_SETTLEMENT_CONTRACT
-        );
+        ICowSettlement cowSettlement = ICowSettlement(Constants.DEFAULT_SETTLEMENT_CONTRACT);
 
         // Calculate the CREATE2 address first
         address expectedAddress = vm.computeCreate2Address(
-            Constants.SALT,
-            keccak256(
-                abi.encodePacked(
-                    type(FlashLoanRouter).creationCode,
-                    abi.encode(cowSettlement)
-                )
-            )
+            Constants.SALT, keccak256(abi.encodePacked(type(FlashLoanRouter).creationCode, abi.encode(cowSettlement)))
         );
 
         // Only deploy if no code exists at that address
         if (expectedAddress.code.length == 0) {
             vm.broadcast();
             router = new FlashLoanRouter{salt: Constants.SALT}(cowSettlement);
-            console.log(
-                "FlashLoanRouter has been deployed at:",
-                address(router)
-            );
+            console.log("FlashLoanRouter has been deployed at:", address(router));
         } else {
             router = FlashLoanRouter(expectedAddress);
-            console.log(
-                "FlashLoanRouter was already deployed at:",
-                address(router)
-            );
+            console.log("FlashLoanRouter was already deployed at:", address(router));
         }
     }
 }
