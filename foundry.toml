@@ -18,6 +18,10 @@ optimizer_runs = 1000000
 # https://github.com/foundry-rs/foundry/issues/6908
 isolate = true
 
+fs_permissions = [
+  { access = "read", path = "./networks.json"}
+]
+
 
 [fmt]
 sort_imports = true
