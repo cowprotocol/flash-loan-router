@@ -38,7 +38,7 @@ contract DeployERC3156Borrower is Script {
     /// @param flashLoanRouter The FlashLoanRouter instance.
     /// @return borrower The deployed ERC3156Borrower contract instance.
     function deployERC3156Borrower(FlashLoanRouter flashLoanRouter) internal returns (ERC3156Borrower borrower) {
-        Asserts.assertFlashLoanRouter(flashLoanRouter);
+        Asserts.usesDefaultSettlementContract(flashLoanRouter);
 
         borrower = new ERC3156Borrower{salt: Constants.SALT}(flashLoanRouter);
 

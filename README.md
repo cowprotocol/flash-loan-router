@@ -4,11 +4,14 @@ A smart contract that allows CoW-Protocol solvers to execute a settlement with t
 
 # Ethereum addresses
 
+The flash-loan router is introduced as part of the protocol with [CIP 66](https://snapshot.box/#/s:cow.eth/proposal/0x6f3d88347bcc8de87ecded2442c090d8eb1d3ef99eca75a831ee220ff5705f00).
+All contracts are deployed deterministically with `CREATE2` and have the same address on all supported networks.
+
 - FlashLoanRouter: `0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69`
 - AaveBorrower: `0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A`
 - ERC3156Borrower: `0x47d71b4B3336AB2729436186C216955F3C27cD04`
 
-For detailed see [networks.json](./networks.json)
+See [networks.json](./networks.json) for details.
 
 
 ## Design
@@ -160,21 +163,29 @@ To deploy all contracts in a single run, the [DeployAllContracts](script/DeployA
 ```shell
 source .env
 
-forge script script/DeployAllContracts.s.sol:DeployAllContracts --rpc-url $ETH_RPC_URL --private-key $PRIVATE_KEY --broadcast
+# Dry-run the deployment
+forge script script/DeployAllContracts.s.sol:DeployAllContracts --rpc-url $ETH_RPC_URL --private-key $PRIVATE_KEY 
+
+# Broadcast the deployment
+#   Don't forget to add the --verify flag
+#   For Etherscan verification, ensure that the `ETHERSCAN_API_KEY` environment variable is set
+forge script script/DeployAllContracts.s.sol:DeployAllContracts --rpc-url $ETH_RPC_URL --private-key $PRIVATE_KEY --broadcast --verify
 ```
 
 For Etherscan verification, ensure that the `ETHERSCAN_API_KEY` environment variable is set and add the `--verify` flag to the `forge script` deployment commands.
 
-Alternatively, you can verify the contract after the deployment:
+#### Verification of deployed contracts
+To verify an already deployed contract, you can use the `forge verify-contract` command.
+
 ```shell
 # Verify FlashLoanRouter
-forge verify-contract 0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69 src/FlashLoanRouter.sol:FlashLoanRouter --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0x9008D19f58AAbD9eD0D60971565AA8510560ab41)
+forge verify-contract 0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69 src/FlashLoanRouter.sol:FlashLoanRouter  --chain-id $CHAIN_ID --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0x9008D19f58AAbD9eD0D60971565AA8510560ab41)
 
 # Verify AaveBorrower
-forge verify-contract 0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A src/AaveBorrower.sol:AaveBorrower --chain-id 1 --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69)
+forge verify-contract 0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A src/AaveBorrower.sol:AaveBorrower --chain-id $CHAIN_ID --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69)
 
 # Verify ERC3156Borrower
-forge verify-contract 0x47d71b4B3336AB2729436186C216955F3C27cD04 src/ERC3156Borrower.sol:ERC3156Borrower --chain-id 1 --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69)
+forge verify-contract 0x47d71b4B3336AB2729436186C216955F3C27cD04 src/ERC3156Borrower.sol:ERC3156Borrower --chain-id $CHAIN_ID --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode "constructor(address)" 0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69)
 
 ```
 
