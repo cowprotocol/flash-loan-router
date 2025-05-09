@@ -38,7 +38,7 @@ contract DeployAAVEBorrower is Script {
     /// @param flashLoanRouter The FlashLoanRouter instance.
     /// @return borrower The deployed AaveBorrower contract instance.
     function deployAAVEBorrower(FlashLoanRouter flashLoanRouter) internal returns (AaveBorrower borrower) {
-        Asserts.assertFlashLoanRouter(flashLoanRouter);
+        Asserts.usesDefaultSettlementContract(flashLoanRouter);
 
         address expectedAddress = vm.computeCreate2Address(
             Constants.SALT, keccak256(abi.encodePacked(type(AaveBorrower).creationCode, abi.encode(flashLoanRouter)))
