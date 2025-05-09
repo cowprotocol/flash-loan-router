@@ -10,8 +10,7 @@ import {DeployFlashLoanRouter, FlashLoanRouter} from "./single-deployment/Deploy
 
 /// @title Deploy All Contracts
 /// @author CoW DAO developers
-/// @notice A deployment contract that deploys both
-/// `FlashLoanRouter` and `AaveBorrower` contracts.
+/// @notice A deployment contract that deploys all contracts.
 contract DeployAllContracts is DeployFlashLoanRouter, DeployAAVEBorrower, DeployERC3156Borrower {
     function run() public override(DeployFlashLoanRouter, DeployAAVEBorrower, DeployERC3156Borrower) {
         deployAll();
