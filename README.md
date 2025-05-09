@@ -4,11 +4,14 @@ A smart contract that allows CoW-Protocol solvers to execute a settlement with t
 
 # Ethereum addresses
 
+The flash-loan router is introduced as part of the protocol with [CIP 66](https://snapshot.box/#/s:cow.eth/proposal/0x6f3d88347bcc8de87ecded2442c090d8eb1d3ef99eca75a831ee220ff5705f00).
+All contracts are deployed deterministically with `CREATE2` and have the same address on all supported networks.
+
 - FlashLoanRouter: `0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69`
 - AaveBorrower: `0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A`
 - ERC3156Borrower: `0x47d71b4B3336AB2729436186C216955F3C27cD04`
 
-For detailed see [networks.json](./networks.json)
+See [networks.json](./networks.json) for details.
 
 
 ## Design
