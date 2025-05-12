@@ -12,10 +12,15 @@ import {Constants} from "test/e2e/lib/Constants.sol";
 import {CowProtocolMock} from "test/test-lib/CowProtocolMock.sol";
 
 contract DeployAllContractsTest is Test {
+    string private networksJson;
+
     DeployAllContracts private script;
     CowProtocolMock private cowProtocolMock;
 
     function setUp() external {
+        string memory projectRoot = vm.projectRoot();
+        networksJson = vm.readFile(string.concat(projectRoot, "/networks.json"));
+
         script = new DeployAllContracts();
         cowProtocolMock =
             new CowProtocolMock(vm, address(Constants.SETTLEMENT_CONTRACT), address(Constants.SOLVER_AUTHENTICATOR));
@@ -33,9 +38,6 @@ contract DeployAllContractsTest is Test {
     }
 
     function addressFromNetworksJson(string memory contractName, uint256 chain) private view returns (address) {
-        string memory projectRoot = vm.projectRoot();
-        string memory networksJson = vm.readFile(string.concat(projectRoot, "/networks.json"));
-
         string memory addressJsonKey = string.concat(".", contractName, ".", vm.toString(chain), ".address");
         bytes memory data = vm.parseJson(networksJson, addressJsonKey);
         return abi.decode(data, (address));
