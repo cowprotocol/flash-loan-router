@@ -20,6 +20,7 @@ contract DeployAllContracts is DeployFlashLoanRouter, DeployAAVEBorrower, Deploy
     /// It first deploys the FlashLoanRouter and then passes it to deployAAVEBorrower to deploy the AaveBorrower.
     /// @return flashLoanRouter The deployed FlashLoanRouter contract instance.
     /// @return aaveBorrower The deployed AaveBorrower contract instance.
+    /// @return erc3156Borrower The deployed ERC3156Borrower contract instance.
     function deployAll()
         public
         returns (FlashLoanRouter flashLoanRouter, AaveBorrower aaveBorrower, ERC3156Borrower erc3156Borrower)
