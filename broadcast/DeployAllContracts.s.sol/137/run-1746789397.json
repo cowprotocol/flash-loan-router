@@ -1,14 +1,12 @@
 {
   "transactions": [
     {
-      "hash": null,
+      "hash": "0x7b4e90d41ab58aac8edb19e45ffb1d89701c7b26616218bf62152d5c897dab32",
       "transactionType": "CREATE2",
       "contractName": "FlashLoanRouter",
       "contractAddress": "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
       "function": null,
-      "arguments": [
-        "0x9008D19f58AAbD9eD0D60971565AA8510560ab41"
-      ],
+      "arguments": ["0x9008D19f58AAbD9eD0D60971565AA8510560ab41"],
       "transaction": {
         "from": "0x016f34d4f2578c3e9dffc3f2b811ba30c0c9e7f3",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -22,14 +20,12 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": null,
+      "hash": "0x216794a85012bcc4460788646460458ea0777e05d459d6ee17fccf4be33858d0",
       "transactionType": "CREATE2",
       "contractName": "AaveBorrower",
       "contractAddress": "0x7d9c4dee56933151bc5c909cfe09def0d315cb4a",
       "function": null,
-      "arguments": [
-        "0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69"
-      ],
+      "arguments": ["0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69"],
       "transaction": {
         "from": "0x016f34d4f2578c3e9dffc3f2b811ba30c0c9e7f3",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -43,14 +39,12 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": null,
+      "hash": "0x563cf9260dacdcdd6eab2751630034ad4a071ce2f095509f5d37e0346123943c",
       "transactionType": "CREATE2",
       "contractName": "ERC3156Borrower",
       "contractAddress": "0x47d71b4b3336ab2729436186c216955f3c27cd04",
       "function": null,
-      "arguments": [
-        "0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69"
-      ],
+      "arguments": ["0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69"],
       "transaction": {
         "from": "0x016f34d4f2578c3e9dffc3f2b811ba30c0c9e7f3",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
