@@ -4,6 +4,7 @@ pragma solidity ^0.8;
 import {Test, Vm} from "forge-std/Test.sol";
 
 import {FlashLoanRouter, Loan} from "src/FlashLoanRouter.sol";
+import {Repayer} from "src/Repayer.sol";
 import {IBorrower, ICowSettlement, IERC20} from "src/interface/IBorrower.sol";
 
 import {AaveSetup} from "./Aave.t.sol";
@@ -22,6 +23,21 @@ uint256 constant SETTLEMENT_24H_MAX_SIZE = 45146;
 uint256 constant SETTLEMENT_24H_AVERAGE_SIZE = 7598;
 uint256 constant SETTLEMENT_24H_MEDIAN_SIZE = 4442;
 
+address constant RANDOM_DAI_WHALE = 0xD1668fB5F690C59Ab4B0CAbAd0f8C1617895052B;
+
+// No trades, it just gives away money for free.
+contract AMM {
+    IERC20 public token;
+
+    constructor(IERC20 _token) {
+        token = _token;
+    }
+
+    function siphon(address to, uint256 amount) public {
+        require(token.transfer(to, amount));
+    }
+}
+
 abstract contract BenchmarkFixture is Test {
     using ForkedRpc for Vm;
 
@@ -35,12 +51,19 @@ abstract contract BenchmarkFixture is Test {
     FlashLoanRouter internal router;
     BenchLoan[] internal loans;
     string private benchGroup;
+    Repayer private repayer;
+    AMM private amm;
 
     constructor(string memory _benchGroup) {
         vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
         router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
         CowProtocol.addSolver(vm, solver);
         benchGroup = _benchGroup;
+        repayer = new Repayer();
+        amm = new AMM(Constants.DAI);
+        vm.prank(RANDOM_DAI_WHALE);
+        Constants.DAI.transfer(address(amm), 1_000_000 ether);
+
         populateLoanPlan();
     }
 
@@ -85,7 +108,7 @@ abstract contract BenchmarkFixture is Test {
         // consider the impact of this extra data overall small.
 
         ICowSettlement.Interaction[] memory interactionsWithFlashLoan =
-            new ICowSettlement.Interaction[](3 * loans.length + 1);
+            new ICowSettlement.Interaction[](3 * loans.length + 2);
 
         // We always loan just 1 wei so that we don't need to transfer funds
         // around.
@@ -115,10 +138,18 @@ abstract contract BenchmarkFixture is Test {
             );
         }
 
-        for (uint256 i = 0; i < loans.length; i++) {
-            interactionsWithFlashLoan[head++] =
-                CowProtocolInteraction.transfer(loans[i].token, address(loans[i].borrower), loanedAmount + fees);
-        }
+        // Cheating: this only work for the Maker case
+        require(loans.length == 1, "bad test assumption");
+        require(loans[0].token == Constants.DAI, "bad test assumption");
+        uint256 freeMoney = loanedAmount + fees;
+        interactionsWithFlashLoan[head++] = ICowSettlement.Interaction({
+            target: address(amm),
+            value: 0,
+            callData: abi.encodeCall(AMM.siphon, (address(Constants.SETTLEMENT_CONTRACT), freeMoney))
+        });
+
+        interactionsWithFlashLoan[head++] =
+            CowProtocolInteraction.transfer(loans[0].token, address(loans[0].borrower), loanedAmount + fees);
 
         interactionsWithFlashLoan[head++] =
             ICowSettlement.Interaction({target: address(0), value: 0, callData: new bytes(extraDataSize)});
@@ -211,41 +242,6 @@ contract E2eBenchmarkMaker is BenchmarkFixture {
     constructor() BenchmarkFixture("Maker") {}
 
     function populateLoanPlan() internal override {
-        loans.push(
-            BenchLoan({
-                borrower: MakerSetup.prepareBorrower(vm, router, solver),
-                lender: address(MakerSetup.FLASH_LOAN_CONTRACT),
-                token: Constants.DAI
-            })
-        );
-    }
-}
-
-contract E2eBenchmarkAave is BenchmarkFixture {
-    constructor() BenchmarkFixture("Aave") {}
-
-    function populateLoanPlan() internal override {
-        loans.push(
-            BenchLoan({
-                borrower: AaveSetup.prepareBorrower(vm, router, solver),
-                lender: address(AaveSetup.WETH_POOL),
-                token: Constants.WETH
-            })
-        );
-    }
-}
-
-contract E2eBenchmarkAaveThenMaker is BenchmarkFixture {
-    constructor() BenchmarkFixture("AaveThenMaker") {}
-
-    function populateLoanPlan() internal override {
-        loans.push(
-            BenchLoan({
-                borrower: AaveSetup.prepareBorrower(vm, router, solver),
-                lender: address(AaveSetup.WETH_POOL),
-                token: Constants.WETH
-            })
-        );
         loans.push(
             BenchLoan({
                 borrower: MakerSetup.prepareBorrower(vm, router, solver),

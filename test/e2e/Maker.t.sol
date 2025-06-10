@@ -4,7 +4,8 @@ pragma solidity ^0.8;
 import {Test, Vm} from "forge-std/Test.sol";
 
 import {ERC3156Borrower, IERC3156FlashLender} from "src/ERC3156Borrower.sol";
-import {FlashLoanRouter, ICowSettlement, Loan} from "src/FlashLoanRouter.sol";
+import {FlashLoanRouter, ICowSettlement, IERC20, Loan} from "src/FlashLoanRouter.sol";
+import {Repayer} from "src/Repayer.sol";
 
 import {CowProtocol} from "./lib//CowProtocol.sol";
 import {Constants} from "./lib/Constants.sol";
@@ -36,6 +37,19 @@ library MakerSetup {
     }
 }
 
+// No trades, it just gives away money for free.
+contract AMM {
+    IERC20 public token;
+
+    constructor(IERC20 _token) {
+        token = _token;
+    }
+
+    function siphon(address to, uint256 amount) public {
+        require(token.transfer(to, amount));
+    }
+}
+
 /// @dev Documentation for the ERC-3156-compatible flash loans by Maker can be
 /// found at:
 /// <https://docs.makerdao.com/smart-contract-modules/flash-mint-module>
@@ -44,15 +58,22 @@ contract E2eMaker is Test {
 
     uint256 private constant MAINNET_FORK_BLOCK = 21765553;
     address private solver = makeAddr("E2eMaker: solver");
+    address constant RANDOM_DAI_WHALE = 0xD1668fB5F690C59Ab4B0CAbAd0f8C1617895052B;
 
     ERC3156Borrower private borrower;
     TokenBalanceAccumulator private tokenBalanceAccumulator;
     FlashLoanRouter private router;
+    Repayer private repayer;
+    AMM private amm;
 
     function setUp() external {
         vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
         tokenBalanceAccumulator = new TokenBalanceAccumulator();
         router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+        repayer = new Repayer();
+        amm = new AMM(Constants.DAI);
+        vm.prank(RANDOM_DAI_WHALE);
+        Constants.DAI.transfer(address(amm), 1_000_000 ether);
 
         vm.prank(Constants.AUTHENTICATOR_MANAGER);
         Constants.SOLVER_AUTHENTICATOR.addSolver(solver);
@@ -75,7 +96,7 @@ contract E2eMaker is Test {
         TokenBalanceAccumulator.Balance[] memory expectedBalances = new TokenBalanceAccumulator.Balance[](3);
 
         // Start preparing the settlement interactions.
-        ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](6);
+        ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](7);
         // First, we confirm that, at the point in time of the settlement, the
         // flash loan proceeds are indeed stored in the borrower.
         interactionsWithFlashLoan[0] =
@@ -111,9 +132,19 @@ contract E2eMaker is Test {
         interactionsWithFlashLoan[4] = CowProtocolInteraction.borrowerApprove(
             borrower, Constants.DAI, address(MakerSetup.FLASH_LOAN_CONTRACT), loanedAmount
         );
-        // Sixth and finally, send the funds to the borrower for repayment of
+        // Sixth, get funds to repay the loan from the AMM. In principle you'd
+        // have used the borrowed DAI to get another token, which in turn would
+        // be sold to get some DAI back. However, for the sake of the test we
+        // just get it for free.
+        uint256 freeMoney = loanedAmount;
+        interactionsWithFlashLoan[5] = ICowSettlement.Interaction({
+            target: address(amm),
+            value: 0,
+            callData: abi.encodeCall(AMM.siphon, (address(Constants.SETTLEMENT_CONTRACT), freeMoney))
+        });
+        // Seventh and finally, send the funds to the borrower for repayment of
         // the loan.
-        interactionsWithFlashLoan[5] = CowProtocolInteraction.transfer(Constants.DAI, address(borrower), loanedAmount);
+        interactionsWithFlashLoan[6] = CowProtocolInteraction.transfer(Constants.DAI, address(borrower), loanedAmount);
 
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
@@ -129,6 +160,8 @@ contract E2eMaker is Test {
         router.flashLoanAndSettle(loans, settleCallData);
 
         tokenBalanceAccumulator.assertAccumulatorEq(vm, expectedBalances);
-        assertEq(Constants.DAI.balanceOf(address(Constants.SETTLEMENT_CONTRACT)), settlementInitialDaiBalance);
+        assertEq(
+            Constants.DAI.balanceOf(address(Constants.SETTLEMENT_CONTRACT)), settlementInitialDaiBalance + freeMoney
+        );
     }
 }
