@@ -63,6 +63,9 @@ abstract contract BenchmarkFixture is Test {
         amm = new AMM(Constants.DAI);
         vm.prank(RANDOM_DAI_WHALE);
         Constants.DAI.transfer(address(amm), 1_000_000 ether);
+        // Prime storage slot
+        vm.prank(RANDOM_DAI_WHALE);
+        Constants.DAI.transfer(address(repayer), 1);
 
         populateLoanPlan();
     }
