@@ -145,11 +145,14 @@ abstract contract BenchmarkFixture is Test {
         interactionsWithFlashLoan[head++] = ICowSettlement.Interaction({
             target: address(amm),
             value: 0,
-            callData: abi.encodeCall(AMM.siphon, (address(Constants.SETTLEMENT_CONTRACT), freeMoney))
+            callData: abi.encodeCall(AMM.siphon, (address(repayer), freeMoney))
         });
 
-        interactionsWithFlashLoan[head++] =
-            CowProtocolInteraction.transfer(loans[0].token, address(loans[0].borrower), loanedAmount + fees);
+        interactionsWithFlashLoan[head++] = ICowSettlement.Interaction({
+            target: address(repayer),
+            value: 0,
+            callData: abi.encodeCall(Repayer.transfer, (loans[0].token, address(loans[0].borrower), loanedAmount + fees))
+        });
 
         interactionsWithFlashLoan[head++] =
             ICowSettlement.Interaction({target: address(0), value: 0, callData: new bytes(extraDataSize)});
