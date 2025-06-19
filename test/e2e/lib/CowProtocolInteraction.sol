@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import {IBorrower, ICowSettlement, IERC20} from "src/interface/IBorrower.sol";
-
 import {TokenBalanceAccumulator} from "./TokenBalanceAccumulator.sol";
+import {IFlashLoanTracker} from "src/FlashLoanTracker.sol";
+import {IBorrower, ICowSettlement, IERC20} from "src/interface/IBorrower.sol";
 
 library CowProtocolInteraction {
     function transferFrom(IERC20 token, address from, address to, uint256 amount)
@@ -51,6 +51,18 @@ library CowProtocolInteraction {
             target: address(tokenBalanceAccumulator),
             value: 0,
             callData: abi.encodeCall(TokenBalanceAccumulator.push, (token, owner))
+        });
+    }
+
+    function repayLoan(IFlashLoanTracker tracker, address pool, address token, uint256 amount, address onBehalfOf)
+        internal
+        pure
+        returns (ICowSettlement.Interaction memory)
+    {
+        return ICowSettlement.Interaction({
+            target: address(tracker),
+            value: 0,
+            callData: abi.encodeCall(IFlashLoanTracker.repay, (pool, token, amount, 2, onBehalfOf))
         });
     }
 }
