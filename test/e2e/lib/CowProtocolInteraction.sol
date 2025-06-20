@@ -65,4 +65,16 @@ library CowProtocolInteraction {
             callData: abi.encodeCall(IFlashLoanTracker.repay, (pool, token, amount, 2, onBehalfOf))
         });
     }
+
+    function supplyToAave(IFlashLoanTracker tracker, address atoken, address asset, uint256 amount, address destination)
+        internal
+        pure
+        returns (ICowSettlement.Interaction memory)
+    {
+        return ICowSettlement.Interaction({
+            target: address(tracker),
+            value: 0,
+            callData: abi.encodeCall(IFlashLoanTracker.supply, (atoken, asset, amount, destination))
+        });
+    }
 }

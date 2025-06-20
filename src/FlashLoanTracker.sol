@@ -7,6 +7,8 @@ import {IERC20} from "./vendored/IERC20.sol";
 import {SafeERC20} from "./vendored/SafeERC20.sol";
 
 interface IFlashLoanTracker {
+    function supply(address atoken, address asset, uint256 amount, address destination) external;
+
     function repay(address pool, address asset, uint256 amount, uint256 interestRateMode, address onBehalfOf)
         external
         returns (uint256);
