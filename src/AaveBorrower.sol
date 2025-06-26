@@ -41,6 +41,20 @@ contract AaveBorrower is Borrower, IAaveFlashLoanReceiver {
         );
     }
 
+    // user -> token -> amount
+    mapping(address => mapping(IERC20 => uint256)) open;
+
+    function takeOut(address user, IERC20 token, uint256 amount) external onlySettlementContract {
+        open[user][token] += amount;
+        token.transfer(user, amount);
+    }
+
+    function payBack(address user, IERC20 token) external onlySettlementContract {
+        uint256 amount = open[user][token];
+        open[user][token] = 0;
+        token.transferFrom(user, address(this), amount);
+    }
+
     /// @inheritdoc IAaveFlashLoanReceiver
     function executeOperation(
         address[] calldata,
