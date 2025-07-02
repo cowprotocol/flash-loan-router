@@ -108,6 +108,9 @@ contract E2eHelperContract is Test {
         );
         vm.stopPrank();
 
+        // Ensure there are 2.5k DAI in the settlement contract so the trade works
+        deal(address(Constants.DAI), address(Constants.SETTLEMENT_CONTRACT), 2_500 ether);
+
         // Flashloan definition
         Loan.Data[] memory _loans = new Loan.Data[](1);
         _loans[0] = Loan.Data({amount: 10 ether, borrower: borrower, lender: address(POOL), token: Constants.WETH});
@@ -115,7 +118,7 @@ contract E2eHelperContract is Test {
         /*
             The order will be:
             Sell token: WETH - Buy token: DAI
-            from: helper - to: helper
+            from: user - to: helper
         */
         GPv2Order.Data memory order = GPv2Order.Data({
             sellToken: Constants.WETH,
