@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
+import {IAavePool} from "../vendored/IAavePool.sol";
 import {IERC20} from "../vendored/IERC20.sol";
 import {SafeERC20} from "../vendored/SafeERC20.sol";
 
@@ -12,10 +13,6 @@ interface IAaveToken {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
-interface IAavePool {
-    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
-}
-
 library OrderHelperError {
     error BadParameters();
     error OrderDoesNotMatchMessageHash();
@@ -24,6 +21,7 @@ library OrderHelperError {
     error NotSellOrder();
     error BadReceiver();
     error BadSellAmount();
+    error NotEnoughSupplyAmount();
 }
 
 /// @title OrderHelper
@@ -42,15 +40,18 @@ contract OrderHelper is Initializable {
     IERC20 public newCollateral;
     uint256 public oldCollateralAmount;
     uint256 public flashloanFee;
+    uint256 public minSupplyAmount;
 
     function initialize(
         address _owner,
         address _borrower,
         address _oldCollateral,
-        address _newCollateral,
         uint256 _oldCollateralAmount,
+        address _newCollateral,
+        uint256 _minSupplyAmount,
         uint256 _flashloanFee
     ) external initializer {
+        // TODO: check the other params?
         if (_owner == address(0)) {
             revert OrderHelperError.BadParameters();
         }
@@ -60,11 +61,14 @@ contract OrderHelper is Initializable {
         oldCollateral = IERC20(_oldCollateral);
         newCollateral = IERC20(_newCollateral);
         oldCollateralAmount = _oldCollateralAmount;
+        minSupplyAmount = _minSupplyAmount;
         flashloanFee = _flashloanFee;
 
-        // Approve the underlying token for the swap
-        address _sellingToken = IAaveToken(_oldCollateral).UNDERLYING_ASSET_ADDRESS();
-        IERC20(_sellingToken).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
+        // Approve the _oldCollateral token for the swap
+        IERC20(_oldCollateral).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
+
+        // Approve the new collateral to deposit into aave after the trade
+        IERC20(_newCollateral).forceApprove(AAVE_LENDING_POOL, type(uint256).max);
     }
 
     function isValidSignature(bytes32 _orderHash, bytes calldata _signature) external view returns (bytes4) {
@@ -78,7 +82,7 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.OrderDoesNotMatchMessageHash();
         }
 
-        if (address(_order.sellToken) != IAaveToken(address(oldCollateral)).UNDERLYING_ASSET_ADDRESS()) {
+        if (_order.sellToken != oldCollateral) {
             revert OrderHelperError.BadSellToken();
         }
 
@@ -102,15 +106,17 @@ contract OrderHelper is Initializable {
     }
 
     function swapCollateral() external {
-        require(msg.sender == SETTLEMENT);
+        // TODO make this trampoline only?
 
-        // After a swap, the full output will be sent to the owner
-        newCollateral.transfer(owner, newCollateral.balanceOf(address(this)));
+        uint256 _supplyAmount = newCollateral.balanceOf(address(this));
+        if (_supplyAmount < minSupplyAmount) {
+            revert OrderHelperError.NotEnoughSupplyAmount();
+        }
+        IAavePool(AAVE_LENDING_POOL).supply(address(newCollateral), _supplyAmount, owner, 0);
 
-        // Once the old collateral is unlocked, move to this contract and withdraw
-        IERC20(oldCollateral).transferFrom(owner, address(this), oldCollateralAmount);
-
-        address _underlying = IAaveToken(address(oldCollateral)).UNDERLYING_ASSET_ADDRESS();
-        IAavePool(AAVE_LENDING_POOL).withdraw(_underlying, type(uint256).max, borrower);
+        // Once the old collateral is unlocked, move it's atoken to this contract and withdraw to the borrower
+        address _oldCollateralAToken = IAavePool(AAVE_LENDING_POOL).getReserveAToken(address(oldCollateral));
+        IERC20(_oldCollateralAToken).transferFrom(owner, address(this), oldCollateralAmount);
+        IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, borrower);
     }
 }

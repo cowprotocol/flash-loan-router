@@ -5,6 +5,10 @@ import {IBorrower, ICowSettlement, IERC20} from "src/interface/IBorrower.sol";
 
 import {TokenBalanceAccumulator} from "./TokenBalanceAccumulator.sol";
 
+interface IOrderHelper {
+    function swapCollateral() external;
+}
+
 library CowProtocolInteraction {
     function transferFrom(IERC20 token, address from, address to, uint256 amount)
         internal
@@ -51,6 +55,14 @@ library CowProtocolInteraction {
             target: address(tokenBalanceAccumulator),
             value: 0,
             callData: abi.encodeCall(TokenBalanceAccumulator.push, (token, owner))
+        });
+    }
+
+    function orderHelperSwapCollateral(address helper) internal pure returns (ICowSettlement.Interaction memory) {
+        return ICowSettlement.Interaction({
+            target: address(helper),
+            value: 0,
+            callData: abi.encodeCall(IOrderHelper.swapCollateral, ())
         });
     }
 }
