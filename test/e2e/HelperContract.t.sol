@@ -47,7 +47,14 @@ contract E2eHelperContract is Test {
 
     function test_orderHelperFactory() external {
         address _clone = factory.deployOrderHelper(
-            user, address(borrower), address(Constants.WETH), 10 ether, address(Constants.DAI), 2500 ether, 0
+            user,
+            address(borrower),
+            address(Constants.WETH),
+            10 ether,
+            address(Constants.DAI),
+            2500 ether,
+            0xffffffff,
+            0
         );
 
         OrderHelper helper = OrderHelper(_clone);
@@ -57,6 +64,8 @@ contract E2eHelperContract is Test {
         assertEq(helper.oldCollateralAmount(), 10 ether);
         assertEq(address(helper.newCollateral()), address(Constants.DAI));
         assertEq(helper.minSupplyAmount(), 2500 ether);
+        assertEq(helper.validTo(), 0xffffffff);
+        assertNotEq(helper.appData(), bytes32(0));
         assertEq(helper.flashloanFee(), 0);
     }
 
@@ -71,7 +80,14 @@ contract E2eHelperContract is Test {
 
         // Order helper contract deployment can happen before or inside a hook, it doesn't matter.
         address _clone = factory.deployOrderHelper(
-            user, address(borrower), address(Constants.WETH), 10 ether, address(Constants.DAI), 2_500 ether, 0
+            user,
+            address(borrower),
+            address(Constants.WETH),
+            10 ether,
+            address(Constants.DAI),
+            2_500 ether,
+            0xffffffff,
+            0
         );
         OrderHelper helper = OrderHelper(_clone);
 

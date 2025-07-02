@@ -15,13 +15,20 @@ interface IAaveToken {
 
 library OrderHelperError {
     error BadParameters();
+    error AppDataDoesNotMatch();
     error OrderDoesNotMatchMessageHash();
     error BadSellToken();
     error BadBuyToken();
+    error WrongValidTo();
     error NotSellOrder();
     error BadReceiver();
     error BadSellAmount();
+    error FeeIsNotZero();
+    error NotEnoughBuyAmount();
+    error NoPartiallyFillable();
+    error OnlyBalanceERC20();
     error NotEnoughSupplyAmount();
+    error NotLongerValid();
 }
 
 /// @title OrderHelper
@@ -37,10 +44,12 @@ contract OrderHelper is Initializable {
     address public owner;
     address public borrower;
     IERC20 public oldCollateral;
-    IERC20 public newCollateral;
     uint256 public oldCollateralAmount;
-    uint256 public flashloanFee;
+    IERC20 public newCollateral;
     uint256 public minSupplyAmount;
+    uint32 public validTo;
+    uint256 public flashloanFee;
+    bytes32 public appData;
 
     function initialize(
         address _owner,
@@ -49,10 +58,16 @@ contract OrderHelper is Initializable {
         uint256 _oldCollateralAmount,
         address _newCollateral,
         uint256 _minSupplyAmount,
-        uint256 _flashloanFee
+        uint32 _validTo,
+        uint256 _flashloanFee,
+        bytes32 _appData
     ) external initializer {
         // TODO: check the other params?
         if (_owner == address(0)) {
+            revert OrderHelperError.BadParameters();
+        }
+
+        if (_validTo < block.timestamp) {
             revert OrderHelperError.BadParameters();
         }
 
@@ -62,7 +77,9 @@ contract OrderHelper is Initializable {
         newCollateral = IERC20(_newCollateral);
         oldCollateralAmount = _oldCollateralAmount;
         minSupplyAmount = _minSupplyAmount;
+        validTo = _validTo;
         flashloanFee = _flashloanFee;
+        appData = _appData;
 
         // Approve the _oldCollateral token for the swap
         IERC20(_oldCollateral).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
@@ -72,10 +89,11 @@ contract OrderHelper is Initializable {
     }
 
     function isValidSignature(bytes32 _orderHash, bytes calldata _signature) external view returns (bytes4) {
-        // TODO: Grab order, user's signature from _signature
-        // Validate the owner signed the order
-
         GPv2Order.Data memory _order = abi.decode(_signature, (GPv2Order.Data));
+
+        if (_order.appData != appData) {
+            revert OrderHelperError.AppDataDoesNotMatch();
+        }
 
         bytes32 _rebuiltOrderHash = _order.hash(ISettlement(SETTLEMENT).domainSeparator());
         if (_orderHash != _rebuiltOrderHash) {
@@ -90,6 +108,10 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.BadBuyToken();
         }
 
+        if (_order.validTo != validTo) {
+            revert OrderHelperError.WrongValidTo();
+        }
+
         if (_order.kind != GPv2Order.KIND_SELL) {
             revert OrderHelperError.NotSellOrder();
         }
@@ -102,11 +124,33 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.BadSellAmount();
         }
 
+        if (_order.feeAmount != 0) {
+            revert OrderHelperError.FeeIsNotZero();
+        }
+
+        if (_order.buyAmount < minSupplyAmount) {
+            revert OrderHelperError.NotEnoughBuyAmount();
+        }
+
+        if (_order.partiallyFillable) {
+            revert OrderHelperError.NoPartiallyFillable();
+        }
+
+        if (_order.sellTokenBalance != GPv2Order.BALANCE_ERC20) {
+            revert OrderHelperError.OnlyBalanceERC20();
+        }
+
+        if (_order.buyTokenBalance != GPv2Order.BALANCE_ERC20) {
+            revert OrderHelperError.OnlyBalanceERC20();
+        }
+
         return this.isValidSignature.selector;
     }
 
     function swapCollateral() external {
-        // TODO make this trampoline only?
+        if (validTo < block.timestamp) {
+            revert OrderHelperError.NotLongerValid();
+        }
 
         uint256 _supplyAmount = newCollateral.balanceOf(address(this));
         if (_supplyAmount < minSupplyAmount) {
