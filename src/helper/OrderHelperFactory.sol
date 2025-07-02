@@ -59,11 +59,21 @@ contract OrderHelperFactory {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        uint256 _flashloanFee
+        uint256 _flashloanFee,
+        bytes calldata _preAppDataBytes,
+        bytes calldata _postAppDataBytes
     ) external returns (address orderHelperAddress) {
         bytes32 _salt = keccak256(
             abi.encode(
-                _owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _flashloanFee
+                _owner,
+                _borrower,
+                _oldCollateral,
+                _oldCollateralAmount,
+                _newCollateral,
+                _minSupplyAmount,
+                _flashloanFee,
+                _preAppDataBytes,
+                _postAppDataBytes
             )
         );
         orderHelperAddress = Clones.predictDeterministicAddress(HELPER_IMPLEMENTATION, _salt, address(this));
@@ -73,7 +83,9 @@ contract OrderHelperFactory {
         }
 
         orderHelperAddress = Clones.cloneDeterministic(HELPER_IMPLEMENTATION, _salt);
-        bytes32 _appData = _getAppDataHash(orderHelperAddress);
+        bytes memory _appDataStr =
+            bytes.concat(preAppDataBytes, _addressToBytes(address(orderHelperAddress)), postAppDataBytes);
+        bytes32 _appData = keccak256(bytes(_appDataStr));
 
         try IOrderHelper(orderHelperAddress).initialize(
             _owner,
@@ -104,10 +116,5 @@ contract OrderHelperFactory {
             addressBytes[2 + i * 2] = alphabet[uint8(value[i + 12] >> 4)];
             addressBytes[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
         }
-    }
-
-    function _getAppDataHash(address _newOrder) internal view returns (bytes32) {
-        bytes memory _appDataStr = bytes.concat(preAppDataBytes, _addressToBytes(_newOrder), postAppDataBytes);
-        return keccak256(bytes(_appDataStr));
     }
 }
