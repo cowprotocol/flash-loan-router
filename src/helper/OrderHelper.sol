@@ -48,7 +48,6 @@ contract OrderHelper is Initializable {
     IERC20 public newCollateral;
     uint256 public minSupplyAmount;
     uint32 public validTo;
-    uint256 public flashloanFee;
     bytes32 public appData;
 
     function initialize(
@@ -59,7 +58,6 @@ contract OrderHelper is Initializable {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        uint256 _flashloanFee,
         bytes32 _appData
     ) external initializer {
         // TODO: check the other params?
@@ -78,7 +76,6 @@ contract OrderHelper is Initializable {
         oldCollateralAmount = _oldCollateralAmount;
         minSupplyAmount = _minSupplyAmount;
         validTo = _validTo;
-        flashloanFee = _flashloanFee;
         appData = _appData;
 
         // Approve the _oldCollateral token for the swap
