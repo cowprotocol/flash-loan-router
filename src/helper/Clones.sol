@@ -1,6 +1,6 @@
 // Vendored from OpenZeppelin contracts with minor modifications:
 // - Formatted code
-// <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v5.2/contracts/token/ERC20/IERC20.sol>
+// <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v5.2/contracts/proxy/Clones.sol>
 // Note: v5.2 points to commit acd4ff74de833399287ed6b31b4debf6b2b35527.
 
 // SPDX-License-Identifier: MIT
