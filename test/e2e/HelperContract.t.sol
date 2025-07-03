@@ -78,16 +78,16 @@ contract E2eHelperContract is Test {
         assertEq(Constants.AWETH.balanceOf(user), 10 ether);
         assertEq(Constants.USDS.balanceOf(user), 100 ether);
 
-        // Order helper contract deployment can happen before or inside a hook, it doesn't matter.
-        address _clone = factory.deployOrderHelper(
+        // Get the predeterministic order helper address. Contract will be deployed in a hook
+        address _helperAddress = factory.getOrderHelperAddress(
             user, address(borrower), address(Constants.WETH), 10 ether, address(Constants.DAI), 2_500 ether, 0xffffffff
         );
-        OrderHelper helper = OrderHelper(_clone);
 
+        assertEq(0x15fe801F1227B4870dbCcCb6200384f917c4229d, _helperAddress);
         // User approvals
         vm.prank(user);
         // Approve the helper to pull the atokens on the swapCollateral hook logic
-        Constants.AWETH.approve(address(helper), type(uint256).max);
+        Constants.AWETH.approve(_helperAddress, type(uint256).max);
 
         // Ensure there are 2.5k DAI in the settlement contract so the trade works
         deal(address(Constants.DAI), address(Constants.SETTLEMENT_CONTRACT), 2_500 ether);
@@ -105,19 +105,19 @@ contract E2eHelperContract is Test {
             /// @dev `0x156c6390` is the selector for `swapCollateral()`
             bytes memory _postAppDataStr = '","callData":"0x156c6390",' '"gasLimit":"100000"}]}}}';
             bytes memory appDataString =
-                bytes.concat(_preAppDataStr, bytes(vm.toLowercase((vm.toString(address(helper))))), _postAppDataStr);
+                bytes.concat(_preAppDataStr, bytes(vm.toLowercase((vm.toString(_helperAddress)))), _postAppDataStr);
             appData = keccak256(appDataString);
         }
 
         /*
             The order will be:
             Sell token: WETH - Buy token: DAI
-            from: user - to: helper
+            from: helper - to: helper
         */
         GPv2Order.Data memory order = GPv2Order.Data({
             sellToken: Constants.WETH,
             buyToken: Constants.DAI,
-            receiver: address(helper),
+            receiver: _helperAddress,
             sellAmount: 10 ether,
             buyAmount: 2_500 ether,
             validTo: type(uint32).max,
@@ -129,24 +129,36 @@ contract E2eHelperContract is Test {
             buyTokenBalance: GPv2Order.BALANCE_ERC20
         });
 
-        ICowSettlement.Interaction[] memory preInteractions = new ICowSettlement.Interaction[](1);
+        ICowSettlement.Interaction[] memory preInteractions = new ICowSettlement.Interaction[](2);
         ICowSettlement.Interaction[] memory postInteractions = new ICowSettlement.Interaction[](3);
 
-        // 0) Move flashloan from the borrower to the user
+        // PRE-0) Move flashloan from the borrower to the user
         preInteractions[0] =
-            CowProtocolInteraction.transferFrom(Constants.WETH, address(borrower), address(helper), 10 ether);
+            CowProtocolInteraction.transferFrom(Constants.WETH, address(borrower), _helperAddress, 10 ether);
 
-        // 1) Mock the "fee payback" by giving flashloan fee to the borrower
+        // PRE-1) Deploy the helper instance
+        preInteractions[1] = CowProtocolInteraction.deployOrderHelper(
+            address(factory),
+            user,
+            address(borrower),
+            address(Constants.WETH),
+            10 ether,
+            address(Constants.DAI),
+            2_500 ether,
+            0xffffffff
+        );
+
+        // POST-0) Mock the "fee payback" by giving flashloan fee to the borrower
         {
             uint256 _fee = 5000000000000000; // 10.005 is flashloan + fee. 0.005 is the fee in eth.
             deal(address(Constants.WETH), address(Constants.SETTLEMENT_CONTRACT), _fee);
             postInteractions[0] = CowProtocolInteraction.transfer(Constants.WETH, address(borrower), _fee);
         }
 
-        // 2) Call helper.swapCollateral()
-        postInteractions[1] = CowProtocolInteraction.orderHelperSwapCollateral(address(helper));
+        // POST-1) Call helper.swapCollateral()
+        postInteractions[1] = CowProtocolInteraction.orderHelperSwapCollateral(_helperAddress);
 
-        // 3) Borrower needs to approve the pool so the flashloan tokens + fees can be pulled out
+        // POST-2) Borrower needs to approve the pool so the flashloan tokens + fees can be pulled out
         postInteractions[2] =
             CowProtocolInteraction.borrowerApprove(borrower, Constants.WETH, address(POOL), type(uint256).max);
 
@@ -163,7 +175,7 @@ contract E2eHelperContract is Test {
             clearingPrices[daiIndex] = order.sellAmount;
 
             ICowSettlement.Trade[] memory trades = new ICowSettlement.Trade[](1);
-            trades[0] = deriveEip1271Trade(order, wethIndex, daiIndex, address(helper));
+            trades[0] = deriveEip1271Trade(order, wethIndex, daiIndex, _helperAddress);
 
             ICowSettlement.Interaction[][3] memory interactions =
                 [preInteractions, new ICowSettlement.Interaction[](0), postInteractions];
@@ -181,12 +193,12 @@ contract E2eHelperContract is Test {
         assertEq(Constants.ADAI.balanceOf(user), 2_500 ether);
 
         // Helper final state
-        assertEq(Constants.AWETH.balanceOf(address(helper)), 0);
-        assertEq(Constants.WETH.balanceOf(address(helper)), 0);
-        assertEq(Constants.ADAI.balanceOf(address(helper)), 0);
+        assertEq(Constants.AWETH.balanceOf(_helperAddress), 0);
+        assertEq(Constants.WETH.balanceOf(_helperAddress), 0);
+        assertEq(Constants.ADAI.balanceOf(_helperAddress), 0);
 
         // borrower final state
-        assertEq(Constants.WETH.balanceOf(address(borrower)), 0);
+        assertEq(Constants.WETH.balanceOf(_helperAddress), 0);
     }
 
     /// @dev Computes the order UID for an order and the given owner

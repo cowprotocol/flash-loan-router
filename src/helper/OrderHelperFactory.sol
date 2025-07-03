@@ -50,6 +50,23 @@ contract OrderHelperFactory {
         postAppDataBytes = bytes(_postAppDataStr);
     }
 
+    function getOrderHelperAddress(
+        address _owner,
+        address _borrower,
+        address _oldCollateral,
+        uint256 _oldCollateralAmount,
+        address _newCollateral,
+        uint256 _minSupplyAmount,
+        uint32 _validTo
+    ) external view returns (address orderHelperAddress) {
+        bytes32 _salt = keccak256(
+            abi.encode(
+                _owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _validTo
+            )
+        );
+        orderHelperAddress = Clones.predictDeterministicAddress(HELPER_IMPLEMENTATION, _salt, address(this));
+    }
+
     function deployOrderHelper(
         address _owner,
         address _borrower,

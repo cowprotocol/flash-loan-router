@@ -9,6 +9,18 @@ interface IOrderHelper {
     function swapCollateral() external;
 }
 
+interface IOrderHelperFactory {
+    function deployOrderHelper(
+        address _owner,
+        address _borrower,
+        address _oldCollateral,
+        uint256 _oldCollateralAmount,
+        address _newCollateral,
+        uint256 _minSupplyAmount,
+        uint32 _validTo
+    ) external returns (address orderHelperAddress);
+}
+
 library CowProtocolInteraction {
     function transferFrom(IERC20 token, address from, address to, uint256 amount)
         internal
@@ -63,6 +75,26 @@ library CowProtocolInteraction {
             target: address(helper),
             value: 0,
             callData: abi.encodeCall(IOrderHelper.swapCollateral, ())
+        });
+    }
+
+    function deployOrderHelper(
+        address factory,
+        address _owner,
+        address _borrower,
+        address _oldCollateral,
+        uint256 _oldCollateralAmount,
+        address _newCollateral,
+        uint256 _minSupplyAmount,
+        uint32 _validTo
+    ) internal pure returns (ICowSettlement.Interaction memory) {
+        return ICowSettlement.Interaction({
+            target: address(factory),
+            value: 0,
+            callData: abi.encodeCall(
+                IOrderHelperFactory.deployOrderHelper,
+                (_owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _validTo)
+            )
         });
     }
 }
