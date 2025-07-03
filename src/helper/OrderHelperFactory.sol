@@ -60,7 +60,9 @@ contract OrderHelperFactory {
         uint32 _validTo
     ) external returns (address orderHelperAddress) {
         bytes32 _salt = keccak256(
-            abi.encode(_owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount)
+            abi.encode(
+                _owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _validTo
+            )
         );
         orderHelperAddress = Clones.predictDeterministicAddress(HELPER_IMPLEMENTATION, _salt, address(this));
 
