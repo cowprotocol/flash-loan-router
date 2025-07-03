@@ -100,13 +100,9 @@ contract E2eHelperContract is Test {
         OrderHelper helper = OrderHelper(_clone);
 
         // User approvals
-        vm.startPrank(user);
+        vm.prank(user);
         // Approve the helper to pull the atokens on the swapCollateral hook logic
         Constants.AWETH.approve(address(helper), type(uint256).max);
-        Constants.WETH.approve(
-            address(ISettlement(address(Constants.SETTLEMENT_CONTRACT)).vaultRelayer()), type(uint256).max
-        );
-        vm.stopPrank();
 
         // Flashloan definition
         Loan.Data[] memory _loans = new Loan.Data[](1);
