@@ -112,6 +112,19 @@ contract E2eHelperContract is Test {
         Loan.Data[] memory _loans = new Loan.Data[](1);
         _loans[0] = Loan.Data({amount: 10 ether, borrower: borrower, lender: address(POOL), token: Constants.WETH});
 
+        bytes32 appData;
+        // Compute app data. This is finicky and must definitely be improved at
+        // a later point.
+        {
+            bytes memory _preAppDataStr = '{"version":"1.4.0",' '"appCode":"aave-v3-flashloan",' '"metadata":'
+                '{"hooks":' '{"version":"0.1.0",' '"pre":[{"target":"';
+            /// @dev `0x156c6390` is the selector for `swapCollateral()`
+            bytes memory _postAppDataStr = '","callData":"0x156c6390",' '"gasLimit":"100000"}]}}}';
+            bytes memory appDataString =
+                bytes.concat(_preAppDataStr, bytes(vm.toLowercase((vm.toString(address(helper))))), _postAppDataStr);
+            appData = keccak256(appDataString);
+        }
+
         /*
             The order will be:
             Sell token: WETH - Buy token: DAI
@@ -124,25 +137,20 @@ contract E2eHelperContract is Test {
             sellAmount: 10 ether,
             buyAmount: 2_500 ether,
             validTo: type(uint32).max,
-            appData: bytes32(0),
+            appData: appData,
             feeAmount: 0,
             kind: GPv2Order.KIND_SELL,
             partiallyFillable: false,
             sellTokenBalance: GPv2Order.BALANCE_ERC20,
             buyTokenBalance: GPv2Order.BALANCE_ERC20
         });
-        {
-            bytes memory orderUid = computeOrderUid(order, user);
-            vm.prank(user);
-            IPreSignTarget(address(Constants.SETTLEMENT_CONTRACT)).setPreSignature(orderUid, true);
-        }
 
         ICowSettlement.Interaction[] memory preInteractions = new ICowSettlement.Interaction[](1);
         ICowSettlement.Interaction[] memory postInteractions = new ICowSettlement.Interaction[](3);
 
         // 0) Move flashloan from the borrower to the user
         preInteractions[0] =
-            CowProtocolInteraction.transferFrom(Constants.WETH, address(borrower), address(user), 10 ether);
+            CowProtocolInteraction.transferFrom(Constants.WETH, address(borrower), address(helper), 10 ether);
 
         // 1) Mock the "fee payback" by giving flashloan fee to the borrower
         {
@@ -171,7 +179,7 @@ contract E2eHelperContract is Test {
             clearingPrices[daiIndex] = order.sellAmount;
 
             ICowSettlement.Trade[] memory trades = new ICowSettlement.Trade[](1);
-            trades[0] = derivePreSignTrade(order, wethIndex, daiIndex, user);
+            trades[0] = deriveEip1271Trade(order, wethIndex, daiIndex, address(helper));
 
             ICowSettlement.Interaction[][3] memory interactions =
                 [preInteractions, new ICowSettlement.Interaction[](0), postInteractions];
@@ -203,7 +211,7 @@ contract E2eHelperContract is Test {
         return abi.encodePacked(order.hash(domainSeparator), owner, order.validTo);
     }
 
-    function derivePreSignTrade(
+    function deriveEip1271Trade(
         GPv2Order.Data memory order,
         uint256 sellTokenIndex,
         uint256 buyTokenIndex,
@@ -213,7 +221,6 @@ contract E2eHelperContract is Test {
         assertEq(order.partiallyFillable, false, "Unsupported partially fillable");
         assertEq(order.sellTokenBalance, GPv2Order.BALANCE_ERC20, "Unsupported order sell token balance");
         assertEq(order.buyTokenBalance, GPv2Order.BALANCE_ERC20, "Unsupported order buy token balance");
-        bytes memory signature = abi.encodePacked(owner);
         return ICowSettlement.Trade(
             sellTokenIndex,
             buyTokenIndex,
@@ -225,7 +232,7 @@ contract E2eHelperContract is Test {
             order.feeAmount,
             packFlags(),
             order.sellAmount,
-            signature
+            abi.encodePacked(owner, abi.encode(order))
         );
     }
 
@@ -236,8 +243,7 @@ contract E2eHelperContract is Test {
         uint256 fillOrKillFlag = 0 << 1;
         uint256 internalSellTokenBalanceFlag = 0 << 2;
         uint256 internalBuyTokenBalanceFlag = 0 << 4;
-        uint256 preSignSignatureFlag = 3 << 5;
-        return sellOrderFlag | fillOrKillFlag | internalSellTokenBalanceFlag | internalBuyTokenBalanceFlag
-            | preSignSignatureFlag;
+        uint256 eip1271Flag = 2 << 5;
+        return sellOrderFlag | fillOrKillFlag | internalSellTokenBalanceFlag | internalBuyTokenBalanceFlag | eip1271Flag;
     }
 }
