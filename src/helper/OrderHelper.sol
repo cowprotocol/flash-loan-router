@@ -13,8 +13,14 @@ interface IAaveToken {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
+interface IOrderFactory {
+    function transferFromOwner(address _token, uint256 _amount) external;
+    function isPresigned() external view returns (bool);
+}
+
 library OrderHelperError {
     error BadParameters();
+    error OrderNotSignedByOwner();
     error AppDataDoesNotMatch();
     error OrderDoesNotMatchMessageHash();
     error BadSellToken();
@@ -39,7 +45,15 @@ contract OrderHelper is Initializable {
     using GPv2Order for GPv2Order.Data;
 
     address public constant SETTLEMENT = 0x9008D19f58AAbD9eD0D60971565AA8510560ab41;
+
+    //mainnet address
     address public constant AAVE_LENDING_POOL = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
+
+    //gnosis address
+    //address public constant AAVE_LENDING_POOL = 0xb50201558B00496A145fE76f7424749556E326D8;
+
+    //sepolia address
+    //address public constant AAVE_LENDING_POOL = 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951;
 
     address public owner;
     address public borrower;
@@ -49,6 +63,7 @@ contract OrderHelper is Initializable {
     uint256 public minSupplyAmount;
     uint32 public validTo;
     bytes32 public appData;
+    address public factory;
 
     function initialize(
         address _owner,
@@ -58,7 +73,8 @@ contract OrderHelper is Initializable {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        bytes32 _appData
+        bytes32 _appData,
+        address _factory
     ) external initializer {
         // TODO: check the other params?
         if (_owner == address(0)) {
@@ -77,6 +93,7 @@ contract OrderHelper is Initializable {
         minSupplyAmount = _minSupplyAmount;
         validTo = _validTo;
         appData = _appData;
+        factory = _factory;
 
         // Approve the _oldCollateral token for the swap
         IERC20(_oldCollateral).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
@@ -88,6 +105,9 @@ contract OrderHelper is Initializable {
     function isValidSignature(bytes32 _orderHash, bytes calldata _signature) external view returns (bytes4) {
         GPv2Order.Data memory _order = abi.decode(_signature, (GPv2Order.Data));
 
+        if (!IOrderFactory(factory).isPresigned()) {
+            revert OrderHelperError.OrderNotSignedByOwner();
+        }
         if (_order.appData != appData) {
             revert OrderHelperError.AppDataDoesNotMatch();
         }
@@ -157,7 +177,7 @@ contract OrderHelper is Initializable {
 
         // Once the old collateral is unlocked, move it's atoken to this contract and withdraw to the borrower
         address _oldCollateralAToken = IAavePool(AAVE_LENDING_POOL).getReserveAToken(address(oldCollateral));
-        IERC20(_oldCollateralAToken).transferFrom(owner, address(this), oldCollateralAmount);
+        IOrderFactory(factory).transferFromOwner(_oldCollateralAToken, oldCollateralAmount);
         IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, borrower);
     }
 }

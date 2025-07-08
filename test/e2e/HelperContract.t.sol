@@ -84,10 +84,15 @@ contract E2eHelperContract is Test {
         );
 
         assertEq(0x15fe801F1227B4870dbCcCb6200384f917c4229d, _helperAddress);
-        // User approvals
-        vm.prank(user);
-        // Approve the helper to pull the atokens on the swapCollateral hook logic
-        Constants.AWETH.approve(_helperAddress, 10 ether);
+
+        // User approvals and pre-actions
+        vm.startPrank(user);
+        // Approve the helper factory to pull the atokens
+        Constants.AWETH.approve(address(factory), 10 ether);
+
+        // Presign the helper
+        factory.setPreApprovedContracts(_helperAddress);
+        vm.stopPrank();
 
         // Ensure there are 2.5k DAI in the settlement contract so the trade works
         deal(address(Constants.DAI), address(Constants.SETTLEMENT_CONTRACT), 2_500 ether);

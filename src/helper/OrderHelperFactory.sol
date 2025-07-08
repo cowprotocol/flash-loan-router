@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
+import {IERC20} from "../vendored/IERC20.sol";
+import {SafeERC20} from "../vendored/SafeERC20.sol";
 import {Clones} from "./Clones.sol";
 
 interface IOrderHelper {
@@ -12,20 +14,36 @@ interface IOrderHelper {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        bytes32 _appData
+        bytes32 _appData,
+        address _factory
     ) external;
+
+    function owner() external view returns (address);
+    function borrower() external view returns (address);
+    function oldCollateral() external view returns (address);
+    function oldCollateralAmount() external view returns (uint256);
+    function newCollateral() external view returns (address);
+    function minSupplyAmount() external view returns (uint256);
+    function validTo() external view returns (uint32);
 }
 
 library FactoryErrors {
     error InvalidImplementationContract();
     error ContractAlreadyDeployed();
     error OrderHelperDeploymentFailed();
+    error BadHelper();
+    error OwnerDidNotApproveTransfer();
 }
 
 contract OrderHelperFactory {
+    using SafeERC20 for IERC20;
+
     event NewOrderHelper(address indexed helper);
 
     address internal immutable HELPER_IMPLEMENTATION;
+
+    // owner -> contract -> bool
+    mapping(address => mapping(address => bool)) preApprovedContracts;
 
     /// @dev appData is the keccak256 hash of bytes.concat(preAppDataBytes, orderAddressBytes, postAppDataBytes)
     /// `orderAddressBytes` corresponds to the address of the new order converted to bytes
@@ -58,7 +76,7 @@ contract OrderHelperFactory {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo
-    ) external view returns (address orderHelperAddress) {
+    ) public view returns (address orderHelperAddress) {
         bytes32 _salt = keccak256(
             abi.encode(
                 _owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _validTo
@@ -98,12 +116,51 @@ contract OrderHelperFactory {
             _newCollateral,
             _minSupplyAmount,
             _validTo,
-            _appData
+            _appData,
+            address(this)
         ) {
             emit NewOrderHelper(orderHelperAddress);
         } catch {
             revert FactoryErrors.OrderHelperDeploymentFailed();
         }
+    }
+
+    function setPreApprovedContracts(address _helper) external {
+        preApprovedContracts[msg.sender][_helper] = true;
+    }
+
+    function isPresigned() external view returns (bool) {
+        IOrderHelper _helper = IOrderHelper(msg.sender);
+        if (_predeterministicAddressFromHelper(_helper) != address(_helper)) {
+            return false;
+        }
+
+        return preApprovedContracts[_helper.owner()][msg.sender];
+    }
+
+    function transferFromOwner(address _token, uint256 _amount) external {
+        IOrderHelper _helper = IOrderHelper(msg.sender);
+        if (_predeterministicAddressFromHelper(_helper) != address(_helper)) {
+            revert FactoryErrors.BadHelper();
+        }
+
+        if (!preApprovedContracts[_helper.owner()][address(_helper)]) {
+            revert FactoryErrors.OwnerDidNotApproveTransfer();
+        }
+
+        IERC20(_token).transferFrom(_helper.owner(), address(_helper), _amount);
+    }
+
+    function _predeterministicAddressFromHelper(IOrderHelper _helper) internal view returns (address) {
+        return getOrderHelperAddress(
+            _helper.owner(),
+            _helper.borrower(),
+            _helper.oldCollateral(),
+            _helper.oldCollateralAmount(),
+            _helper.newCollateral(),
+            _helper.minSupplyAmount(),
+            _helper.validTo()
+        );
     }
 
     function _addressToBytes(address _newOrder) internal pure returns (bytes memory addressBytes) {
