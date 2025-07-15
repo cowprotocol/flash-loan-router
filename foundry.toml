@@ -4,7 +4,7 @@ out = "out"
 libs = ["lib"]
 
 # Compiler settings
-solc = "0.8.28"
+solc = "0.8.30"
 evm_version = "cancun"
 optimizer = true
 optimizer_runs = 1000000
