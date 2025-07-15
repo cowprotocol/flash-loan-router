@@ -17,3 +17,6 @@ docs/
 
 # IDE
 .idea/
+
+# Experimental compiler
+/solx-linux-amd64-gnu-v0.1.0

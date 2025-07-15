@@ -26,9 +26,19 @@ jobs:
           version: v1.2.3
 
 
+      - name: Install Solx
+        run: |
+          wget 'https://github.com/matter-labs/solx/releases/download/0.1.0/solx-linux-amd64-gnu-v0.1.0' \
+          && { echo 'dd790f8bbf470437ddd483e053e2c3d3dd1154fa7f9768d9d5b6ac466f120d3b solx-linux-amd64-gnu-v0.1.0' | sha256sum --check; } \
+          && chmod +x 'solx-linux-amd64-gnu-v0.1.0'
+
       - name: Show Forge version
         run: |
           forge --version
+
+      - name: Show Solx version
+        run: |
+          ./solx-linux-amd64-gnu-v0.1.0 --version
 
       - name: Run Forge fmt
         run: |
