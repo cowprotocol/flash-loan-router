@@ -14,7 +14,7 @@ interface IOrderHelper {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        bytes32 _appData,
+        uint256 _flashloanFee,
         address _factory
     ) external;
 
@@ -25,6 +25,7 @@ interface IOrderHelper {
     function newCollateral() external view returns (address);
     function minSupplyAmount() external view returns (uint256);
     function validTo() external view returns (uint32);
+    function flashloanFee() external view returns (uint256);
 }
 
 library FactoryErrors {
@@ -41,31 +42,18 @@ contract OrderHelperFactory {
     event NewOrderHelper(address indexed helper);
 
     address internal immutable HELPER_IMPLEMENTATION;
+    address public immutable AAVE_LENDING_POOL;
 
     // owner -> contract -> bool
     mapping(address => mapping(address => bool)) preApprovedContracts;
 
-    /// @dev appData is the keccak256 hash of bytes.concat(preAppDataBytes, orderAddressBytes, postAppDataBytes)
-    /// `orderAddressBytes` corresponds to the address of the new order converted to bytes
-    bytes internal preAppDataBytes;
-    bytes internal postAppDataBytes;
-
-    constructor(address _helperImplementation) {
+    constructor(address _helperImplementation, address _aaveLendingPool) {
         HELPER_IMPLEMENTATION = _helperImplementation;
         if (HELPER_IMPLEMENTATION.code.length == 0) {
             revert FactoryErrors.InvalidImplementationContract();
         }
 
-        /* TODO: add partner fee with the proper recipient + bps
-            "partnerFee": {"recipient": "0xC542C2F197c4939154017c802B0583C596438380", "volumeBps": 25},
-        */
-        string memory _preAppDataStr = '{"version":"1.4.0",' '"appCode":"aave-v3-flashloan",' '"metadata":'
-            '{"hooks":' '{"version":"0.1.0",' '"pre":[{"target":"';
-        preAppDataBytes = bytes(_preAppDataStr);
-
-        /// @dev `0x156c6390` is the selector for `swapCollateral()`
-        string memory _postAppDataStr = '","callData":"0x156c6390",' '"gasLimit":"100000"}]}}}';
-        postAppDataBytes = bytes(_postAppDataStr);
+        AAVE_LENDING_POOL = _aaveLendingPool;
     }
 
     function getOrderHelperAddress(
@@ -75,11 +63,19 @@ contract OrderHelperFactory {
         uint256 _oldCollateralAmount,
         address _newCollateral,
         uint256 _minSupplyAmount,
-        uint32 _validTo
+        uint32 _validTo,
+        uint256 _flashloanFee
     ) public view returns (address orderHelperAddress) {
         bytes32 _salt = keccak256(
             abi.encode(
-                _owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _validTo
+                _owner,
+                _borrower,
+                _oldCollateral,
+                _oldCollateralAmount,
+                _newCollateral,
+                _minSupplyAmount,
+                _validTo,
+                _flashloanFee
             )
         );
         orderHelperAddress = Clones.predictDeterministicAddress(HELPER_IMPLEMENTATION, _salt, address(this));
@@ -92,11 +88,19 @@ contract OrderHelperFactory {
         uint256 _oldCollateralAmount,
         address _newCollateral,
         uint256 _minSupplyAmount,
-        uint32 _validTo
+        uint32 _validTo,
+        uint256 _flashloanFee
     ) external returns (address orderHelperAddress) {
         bytes32 _salt = keccak256(
             abi.encode(
-                _owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _validTo
+                _owner,
+                _borrower,
+                _oldCollateral,
+                _oldCollateralAmount,
+                _newCollateral,
+                _minSupplyAmount,
+                _validTo,
+                _flashloanFee
             )
         );
         orderHelperAddress = Clones.predictDeterministicAddress(HELPER_IMPLEMENTATION, _salt, address(this));
@@ -106,7 +110,6 @@ contract OrderHelperFactory {
         }
 
         orderHelperAddress = Clones.cloneDeterministic(HELPER_IMPLEMENTATION, _salt);
-        bytes32 _appData = _getAppDataHash(orderHelperAddress);
 
         try IOrderHelper(orderHelperAddress).initialize(
             _owner,
@@ -116,7 +119,7 @@ contract OrderHelperFactory {
             _newCollateral,
             _minSupplyAmount,
             _validTo,
-            _appData,
+            _flashloanFee,
             address(this)
         ) {
             emit NewOrderHelper(orderHelperAddress);
@@ -159,26 +162,8 @@ contract OrderHelperFactory {
             _helper.oldCollateralAmount(),
             _helper.newCollateral(),
             _helper.minSupplyAmount(),
-            _helper.validTo()
+            _helper.validTo(),
+            _helper.flashloanFee()
         );
-    }
-
-    function _addressToBytes(address _newOrder) internal pure returns (bytes memory addressBytes) {
-        bytes32 value = bytes32(uint256(uint160(_newOrder)));
-        bytes memory alphabet = "0123456789abcdef";
-
-        addressBytes = new bytes(42);
-        addressBytes[0] = "0";
-        addressBytes[1] = "x";
-
-        for (uint256 i = 0; i < 20; i++) {
-            addressBytes[2 + i * 2] = alphabet[uint8(value[i + 12] >> 4)];
-            addressBytes[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
-        }
-    }
-
-    function _getAppDataHash(address _newOrder) internal view returns (bytes32) {
-        bytes memory _appDataStr = bytes.concat(preAppDataBytes, _addressToBytes(_newOrder), postAppDataBytes);
-        return keccak256(bytes(_appDataStr));
     }
 }

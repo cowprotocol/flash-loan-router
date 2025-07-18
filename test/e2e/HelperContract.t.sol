@@ -26,7 +26,8 @@ contract E2eHelperContract is Test {
     using ForkedRpc for Vm;
     using GPv2Order for GPv2Order.Data;
 
-    IAavePool internal constant POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+    IAavePool internal constant AAVE_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+
     uint256 private constant MAINNET_FORK_BLOCK = 22828430;
     address private solver = makeAddr("E2eHelperContract: solver");
     address private user = makeAddr("E2eHelperContract: user");
@@ -48,14 +49,21 @@ contract E2eHelperContract is Test {
         );
         vm.prank(solver);
         CowProtocol.emptySettleWithInteractions(onlyApprove);
-        factory = new OrderHelperFactory(address(new OrderHelper()));
+        factory = new OrderHelperFactory(address(new OrderHelper()), address(AAVE_POOL));
 
         deal(address(Constants.WETH), user, 100 ether);
     }
 
     function test_orderHelperFactory() external {
         address _clone = factory.deployOrderHelper(
-            user, address(borrower), address(Constants.WETH), 10 ether, address(Constants.DAI), 2500 ether, 0xffffffff
+            user,
+            address(borrower),
+            address(Constants.WETH),
+            10 ether,
+            address(Constants.DAI),
+            2500 ether,
+            0xffffffff,
+            0.1 ether
         );
 
         OrderHelper helper = OrderHelper(_clone);
@@ -66,29 +74,36 @@ contract E2eHelperContract is Test {
         assertEq(address(helper.newCollateral()), address(Constants.DAI));
         assertEq(helper.minSupplyAmount(), 2500 ether);
         assertEq(helper.validTo(), 0xffffffff);
-        assertNotEq(helper.appData(), bytes32(0));
+        assertEq(helper.flashloanFee(), 0.1 ether);
     }
 
     function test_10WethCollatWith100UsdsSwappingCollateralForDaiWithFlashLoan() external {
         vm.startPrank(user);
-        Constants.WETH.approve(address(POOL), type(uint256).max);
-        POOL.supply(address(Constants.WETH), 10 ether, user, 0);
-        POOL.borrow(address(Constants.USDS), 100 ether, 2, 0, user);
+        Constants.WETH.approve(address(AAVE_POOL), type(uint256).max);
+        AAVE_POOL.supply(address(Constants.WETH), 10 ether, user, 0);
+        AAVE_POOL.borrow(address(Constants.USDS), 100 ether, 2, 0, user);
         vm.stopPrank();
         assertEq(Constants.AWETH.balanceOf(user), 10 ether);
         assertEq(Constants.USDS.balanceOf(user), 100 ether);
 
+        uint256 _flashloanFee = 5000000000000000; // 10.005 is flashloan + fee. 0.005 is the fee in eth.
+
         // Get the predeterministic order helper address. Contract will be deployed in a hook
         address _helperAddress = factory.getOrderHelperAddress(
-            user, address(borrower), address(Constants.WETH), 10 ether, address(Constants.DAI), 2_500 ether, 0xffffffff
+            user,
+            address(borrower),
+            address(Constants.WETH),
+            10 ether,
+            address(Constants.DAI),
+            2_500 ether,
+            0xffffffff,
+            _flashloanFee
         );
-
-        assertEq(0x15fe801F1227B4870dbCcCb6200384f917c4229d, _helperAddress);
 
         // User approvals and pre-actions
         vm.startPrank(user);
         // Approve the helper factory to pull the atokens
-        Constants.AWETH.approve(address(factory), 10 ether);
+        Constants.AWETH.approve(address(factory), 10 ether + _flashloanFee);
 
         // Presign the helper
         factory.setPreApprovedContracts(_helperAddress);
@@ -99,20 +114,7 @@ contract E2eHelperContract is Test {
 
         // Flashloan definition
         Loan.Data[] memory _loans = new Loan.Data[](1);
-        _loans[0] = Loan.Data({amount: 10 ether, borrower: borrower, lender: address(POOL), token: Constants.WETH});
-
-        bytes32 appData;
-        // Compute app data. This is finicky and must definitely be improved at
-        // a later point.
-        {
-            bytes memory _preAppDataStr = '{"version":"1.4.0",' '"appCode":"aave-v3-flashloan",' '"metadata":'
-                '{"hooks":' '{"version":"0.1.0",' '"pre":[{"target":"';
-            /// @dev `0x156c6390` is the selector for `swapCollateral()`
-            bytes memory _postAppDataStr = '","callData":"0x156c6390",' '"gasLimit":"100000"}]}}}';
-            bytes memory appDataString =
-                bytes.concat(_preAppDataStr, bytes(vm.toLowercase((vm.toString(_helperAddress)))), _postAppDataStr);
-            appData = keccak256(appDataString);
-        }
+        _loans[0] = Loan.Data({amount: 10 ether, borrower: borrower, lender: address(AAVE_POOL), token: Constants.WETH});
 
         /*
             The order will be:
@@ -123,10 +125,10 @@ contract E2eHelperContract is Test {
             sellToken: Constants.WETH,
             buyToken: Constants.DAI,
             receiver: _helperAddress,
-            sellAmount: 10 ether,
+            sellAmount: 10 ether - _flashloanFee,
             buyAmount: 2_500 ether,
             validTo: type(uint32).max,
-            appData: appData,
+            appData: bytes32(0),
             feeAmount: 0,
             kind: GPv2Order.KIND_SELL,
             partiallyFillable: false,
@@ -135,7 +137,7 @@ contract E2eHelperContract is Test {
         });
 
         ICowSettlement.Interaction[] memory preInteractions = new ICowSettlement.Interaction[](2);
-        ICowSettlement.Interaction[] memory postInteractions = new ICowSettlement.Interaction[](3);
+        ICowSettlement.Interaction[] memory postInteractions = new ICowSettlement.Interaction[](2);
 
         // PRE-0) Move flashloan from the borrower to the user
         preInteractions[0] =
@@ -150,22 +152,17 @@ contract E2eHelperContract is Test {
             10 ether,
             address(Constants.DAI),
             2_500 ether,
-            0xffffffff
+            0xffffffff,
+            _flashloanFee
         );
 
-        // POST-0) Mock the "fee payback" by giving flashloan fee to the borrower
-        {
-            uint256 _fee = 5000000000000000; // 10.005 is flashloan + fee. 0.005 is the fee in eth.
-            deal(address(Constants.WETH), address(Constants.SETTLEMENT_CONTRACT), _fee);
-            postInteractions[0] = CowProtocolInteraction.transfer(Constants.WETH, address(borrower), _fee);
-        }
-
         // POST-1) Call helper.swapCollateral()
-        postInteractions[1] = CowProtocolInteraction.orderHelperSwapCollateral(_helperAddress);
+        postInteractions[0] = CowProtocolInteraction.orderHelperSwapCollateral(_helperAddress);
 
         // POST-2) Borrower needs to approve the pool so the flashloan tokens + fees can be pulled out
-        postInteractions[2] =
-            CowProtocolInteraction.borrowerApprove(borrower, Constants.WETH, address(POOL), type(uint256).max);
+        postInteractions[1] = CowProtocolInteraction.borrowerApprove(
+            borrower, Constants.WETH, address(AAVE_POOL), 10 ether + _flashloanFee
+        );
 
         bytes memory _settleCallData;
         {

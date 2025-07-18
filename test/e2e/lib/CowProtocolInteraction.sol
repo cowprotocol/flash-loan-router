@@ -17,7 +17,8 @@ interface IOrderHelperFactory {
         uint256 _oldCollateralAmount,
         address _newCollateral,
         uint256 _minSupplyAmount,
-        uint32 _validTo
+        uint32 _validTo,
+        uint256 _flashloanFee
     ) external returns (address orderHelperAddress);
 }
 
@@ -86,14 +87,24 @@ library CowProtocolInteraction {
         uint256 _oldCollateralAmount,
         address _newCollateral,
         uint256 _minSupplyAmount,
-        uint32 _validTo
+        uint32 _validTo,
+        uint256 _flashloanFee
     ) internal pure returns (ICowSettlement.Interaction memory) {
         return ICowSettlement.Interaction({
             target: address(factory),
             value: 0,
             callData: abi.encodeCall(
                 IOrderHelperFactory.deployOrderHelper,
-                (_owner, _borrower, _oldCollateral, _oldCollateralAmount, _newCollateral, _minSupplyAmount, _validTo)
+                (
+                    _owner,
+                    _borrower,
+                    _oldCollateral,
+                    _oldCollateralAmount,
+                    _newCollateral,
+                    _minSupplyAmount,
+                    _validTo,
+                    _flashloanFee
+                )
             )
         });
     }

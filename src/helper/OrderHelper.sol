@@ -8,20 +8,22 @@ import {SafeERC20} from "../vendored/SafeERC20.sol";
 import {GPv2Order} from "./GPv2Order.sol";
 import {ISettlement} from "./ISettlement.sol";
 import {Initializable} from "./Initializable.sol";
+import {SafeTransfer} from "./SafeTransfer.sol";
+
+interface IOrderFactory {
+    function transferFromOwner(address _token, uint256 _amount) external;
+    function isPresigned() external view returns (bool);
+    function AAVE_LENDING_POOL() external view returns (address);
+}
 
 interface IAaveToken {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
-interface IOrderFactory {
-    function transferFromOwner(address _token, uint256 _amount) external;
-    function isPresigned() external view returns (bool);
-}
-
 library OrderHelperError {
     error BadParameters();
+    error AlreadyExecuted();
     error OrderNotSignedByOwner();
-    error AppDataDoesNotMatch();
     error OrderDoesNotMatchMessageHash();
     error BadSellToken();
     error BadBuyToken();
@@ -35,6 +37,8 @@ library OrderHelperError {
     error OnlyBalanceERC20();
     error NotEnoughSupplyAmount();
     error NotLongerValid();
+    error NotOwner();
+    error InvalidWithdrawArguments();
 }
 
 /// @title OrderHelper
@@ -45,15 +49,7 @@ contract OrderHelper is Initializable {
     using GPv2Order for GPv2Order.Data;
 
     address public constant SETTLEMENT = 0x9008D19f58AAbD9eD0D60971565AA8510560ab41;
-
-    //mainnet address
-    address public constant AAVE_LENDING_POOL = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
-
-    //gnosis address
-    //address public constant AAVE_LENDING_POOL = 0xb50201558B00496A145fE76f7424749556E326D8;
-
-    //sepolia address
-    //address public constant AAVE_LENDING_POOL = 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951;
+    address public AAVE_LENDING_POOL;
 
     address public owner;
     address public borrower;
@@ -62,8 +58,9 @@ contract OrderHelper is Initializable {
     IERC20 public newCollateral;
     uint256 public minSupplyAmount;
     uint32 public validTo;
-    bytes32 public appData;
+    uint256 public flashloanFee;
     address public factory;
+    bool internal done; // false by default
 
     function initialize(
         address _owner,
@@ -73,7 +70,7 @@ contract OrderHelper is Initializable {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        bytes32 _appData,
+        uint256 _flashloanFee,
         address _factory
     ) external initializer {
         // TODO: check the other params?
@@ -92,8 +89,10 @@ contract OrderHelper is Initializable {
         oldCollateralAmount = _oldCollateralAmount;
         minSupplyAmount = _minSupplyAmount;
         validTo = _validTo;
-        appData = _appData;
+        flashloanFee = _flashloanFee;
         factory = _factory;
+
+        AAVE_LENDING_POOL = IOrderFactory(factory).AAVE_LENDING_POOL();
 
         // Approve the _oldCollateral token for the swap
         IERC20(_oldCollateral).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
@@ -103,25 +102,27 @@ contract OrderHelper is Initializable {
     }
 
     function isValidSignature(bytes32 _orderHash, bytes calldata _signature) external view returns (bytes4) {
+        if (done) {
+            revert OrderHelperError.AlreadyExecuted();
+        }
+
         GPv2Order.Data memory _order = abi.decode(_signature, (GPv2Order.Data));
 
-        if (!IOrderFactory(factory).isPresigned()) {
-            revert OrderHelperError.OrderNotSignedByOwner();
-        }
-        if (_order.appData != appData) {
-            revert OrderHelperError.AppDataDoesNotMatch();
-        }
+        // TODO: FIX
+        // if (!IOrderFactory(factory).isPresigned()) {
+        //     revert OrderHelperError.OrderNotSignedByOwner();
+        // }
 
         bytes32 _rebuiltOrderHash = _order.hash(ISettlement(SETTLEMENT).domainSeparator());
         if (_orderHash != _rebuiltOrderHash) {
             revert OrderHelperError.OrderDoesNotMatchMessageHash();
         }
 
-        if (_order.sellToken != oldCollateral) {
+        if (address(_order.sellToken) != address(oldCollateral)) {
             revert OrderHelperError.BadSellToken();
         }
 
-        if (_order.buyToken != newCollateral) {
+        if (address(_order.buyToken) != address(newCollateral)) {
             revert OrderHelperError.BadBuyToken();
         }
 
@@ -137,7 +138,7 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.BadReceiver();
         }
 
-        if (_order.sellAmount != oldCollateralAmount) {
+        if (_order.sellAmount != oldCollateralAmount - flashloanFee) {
             revert OrderHelperError.BadSellAmount();
         }
 
@@ -165,6 +166,10 @@ contract OrderHelper is Initializable {
     }
 
     function swapCollateral() external {
+        if (done) {
+            revert OrderHelperError.AlreadyExecuted();
+        }
+
         if (validTo < block.timestamp) {
             revert OrderHelperError.NotLongerValid();
         }
@@ -175,9 +180,33 @@ contract OrderHelper is Initializable {
         }
         IAavePool(AAVE_LENDING_POOL).supply(address(newCollateral), _supplyAmount, owner, 0);
 
-        // Once the old collateral is unlocked, move it's atoken to this contract and withdraw to the borrower
+        // Once the old collateral is unlocked, move it's atoken to this contract
         address _oldCollateralAToken = IAavePool(AAVE_LENDING_POOL).getReserveAToken(address(oldCollateral));
         IOrderFactory(factory).transferFromOwner(_oldCollateralAToken, oldCollateralAmount);
-        IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, borrower);
+
+        // Withdraw from aave and send everything to the borrower
+        IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, address(this));
+        IERC20(oldCollateral).transfer(borrower, IERC20(oldCollateral).balanceOf(address(this)));
+
+        done = true;
+    }
+
+    function sweep(address[] calldata _tokens, uint256[] calldata _amounts) external {
+        address _owner = owner;
+        if (_owner != msg.sender) {
+            revert OrderHelperError.NotOwner();
+        }
+
+        if (_tokens.length != _amounts.length) {
+            revert OrderHelperError.InvalidWithdrawArguments();
+        }
+
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            if (_tokens[i] == address(0)) {
+                SafeTransfer._safeTransferETH(_owner, _amounts[i]);
+            } else {
+                SafeTransfer._safeTransfer(_tokens[i], _owner, _amounts[i]);
+            }
+        }
     }
 }
