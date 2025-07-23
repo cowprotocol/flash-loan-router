@@ -9,6 +9,7 @@ import {GPv2Order} from "./GPv2Order.sol";
 import {ISettlement} from "./ISettlement.sol";
 import {Initializable} from "./Initializable.sol";
 import {SafeTransfer} from "./SafeTransfer.sol";
+import {SignatureChecker} from "./SignatureChecker.sol";
 
 interface IOrderFactory {
     function transferFromOwner(address _token, uint256 _amount) external;
@@ -20,9 +21,13 @@ interface IAaveToken {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
+interface IAaveBorrower {
+    function payBack(address _user, IERC20 _token) external;
+}
+
 library OrderHelperError {
     error BadParameters();
-    error AlreadyExecuted();
+    error PreHookNotCalled();
     error OrderNotSignedByOwner();
     error OrderDoesNotMatchMessageHash();
     error BadSellToken();
@@ -32,6 +37,7 @@ library OrderHelperError {
     error BadReceiver();
     error BadSellAmount();
     error FeeIsNotZero();
+    error NotEnoughOldCollateral();
     error NotEnoughBuyAmount();
     error NoPartiallyFillable();
     error OnlyBalanceERC20();
@@ -39,6 +45,7 @@ library OrderHelperError {
     error NotLongerValid();
     error NotOwner();
     error InvalidWithdrawArguments();
+    error PreHookAlreadyCalled();
 }
 
 /// @title OrderHelper
@@ -52,15 +59,17 @@ contract OrderHelper is Initializable {
     address public AAVE_LENDING_POOL;
 
     address public owner;
-    address public borrower;
+    IAaveBorrower public borrower;
     IERC20 public oldCollateral;
+    IERC20 public oldCollateralAToken;
     uint256 public oldCollateralAmount;
     IERC20 public newCollateral;
+    IERC20 public newCollateralAToken;
     uint256 public minSupplyAmount;
     uint32 public validTo;
     uint256 public flashloanFee;
     address public factory;
-    bool internal done; // false by default
+    uint256 transient preHookCalled;
 
     function initialize(
         address _owner,
@@ -83,7 +92,7 @@ contract OrderHelper is Initializable {
         }
 
         owner = _owner;
-        borrower = _borrower;
+        borrower = IAaveBorrower(_borrower);
         oldCollateral = IERC20(_oldCollateral);
         newCollateral = IERC20(_newCollateral);
         oldCollateralAmount = _oldCollateralAmount;
@@ -93,36 +102,54 @@ contract OrderHelper is Initializable {
         factory = _factory;
 
         AAVE_LENDING_POOL = IOrderFactory(factory).AAVE_LENDING_POOL();
+        oldCollateralAToken = IERC20(IAavePool(AAVE_LENDING_POOL).getReserveAToken(address(_oldCollateral)));
+        newCollateralAToken = IERC20(IAavePool(AAVE_LENDING_POOL).getReserveAToken(address(_newCollateral)));
 
-        // Approve the _oldCollateral token for the swap
-        IERC20(_oldCollateral).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
+        // Approve the _oldCollateral AToken for the swap
+        IERC20(oldCollateralAToken).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
 
-        // Approve the new collateral to deposit into aave after the trade
-        IERC20(_newCollateral).forceApprove(AAVE_LENDING_POOL, type(uint256).max);
+        // Approve the old collateral to deposit into aave in the prehook
+        IERC20(_oldCollateral).forceApprove(AAVE_LENDING_POOL, type(uint256).max);
+
+        // The system will pull the old collateral to payback the flash loan
+        IERC20(_oldCollateral).forceApprove(_borrower, type(uint256).max);
+    }
+
+    // Prehook will take care of depositing the flash loan amount into aave
+    function preHook() external {
+        if (preHookCalled != 0) {
+            revert OrderHelperError.PreHookAlreadyCalled();
+        }
+        preHookCalled = 1;
+
+        // It should be the same amount, but someone can dust
+        if (oldCollateral.balanceOf(address(this)) < oldCollateralAmount) {
+            revert OrderHelperError.NotEnoughOldCollateral();
+        }
+
+        IAavePool(AAVE_LENDING_POOL).supply(address(oldCollateral), oldCollateralAmount, address(this), 0);
     }
 
     function isValidSignature(bytes32 _orderHash, bytes calldata _signature) external view returns (bytes4) {
-        if (done) {
-            revert OrderHelperError.AlreadyExecuted();
+        if (preHookCalled != 1) {
+            revert OrderHelperError.PreHookNotCalled();
         }
 
-        GPv2Order.Data memory _order = abi.decode(_signature, (GPv2Order.Data));
-
-        // TODO: FIX
-        // if (!IOrderFactory(factory).isPresigned()) {
-        //     revert OrderHelperError.OrderNotSignedByOwner();
-        // }
+        (GPv2Order.Data memory _order, bytes memory _userSignature) = abi.decode(_signature, (GPv2Order.Data, bytes));
+        if (!SignatureChecker.isValidSignatureNow(owner, _orderHash, _userSignature)) {
+            revert OrderHelperError.OrderNotSignedByOwner();
+        }
 
         bytes32 _rebuiltOrderHash = _order.hash(ISettlement(SETTLEMENT).domainSeparator());
         if (_orderHash != _rebuiltOrderHash) {
             revert OrderHelperError.OrderDoesNotMatchMessageHash();
         }
 
-        if (address(_order.sellToken) != address(oldCollateral)) {
+        if (address(_order.sellToken) != address(oldCollateralAToken)) {
             revert OrderHelperError.BadSellToken();
         }
 
-        if (address(_order.buyToken) != address(newCollateral)) {
+        if (address(_order.buyToken) != address(newCollateralAToken)) {
             revert OrderHelperError.BadBuyToken();
         }
 
@@ -134,7 +161,7 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.NotSellOrder();
         }
 
-        if (_order.receiver != address(this)) {
+        if (_order.receiver != owner) {
             revert OrderHelperError.BadReceiver();
         }
 
@@ -165,30 +192,19 @@ contract OrderHelper is Initializable {
         return this.isValidSignature.selector;
     }
 
-    function swapCollateral() external {
-        if (done) {
-            revert OrderHelperError.AlreadyExecuted();
+    function postHook() external {
+        if (preHookCalled != 1) {
+            revert OrderHelperError.PreHookNotCalled();
         }
 
-        if (validTo < block.timestamp) {
-            revert OrderHelperError.NotLongerValid();
-        }
-
-        uint256 _supplyAmount = newCollateral.balanceOf(address(this));
-        if (_supplyAmount < minSupplyAmount) {
-            revert OrderHelperError.NotEnoughSupplyAmount();
-        }
-        IAavePool(AAVE_LENDING_POOL).supply(address(newCollateral), _supplyAmount, owner, 0);
-
-        // Once the old collateral is unlocked, move it's atoken to this contract
-        address _oldCollateralAToken = IAavePool(AAVE_LENDING_POOL).getReserveAToken(address(oldCollateral));
-        IOrderFactory(factory).transferFromOwner(_oldCollateralAToken, oldCollateralAmount);
-
-        // Withdraw from aave and send everything to the borrower
+        // After the swap the owner's oldCollateral is unlocked, move here to unwrap and pay the flashloan
+        IOrderFactory(factory).transferFromOwner(address(oldCollateralAToken), oldCollateralAmount);
         IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, address(this));
-        IERC20(oldCollateral).transfer(borrower, IERC20(oldCollateral).balanceOf(address(this)));
 
-        done = true;
+        borrower.payBack(address(this), oldCollateral);
+
+        // For now we will pay the flashloan fee from the order itself, but this should be taken care by solvers
+        IERC20(oldCollateral).transfer(address(borrower), flashloanFee);
     }
 
     function sweep(address[] calldata _tokens, uint256[] calldata _amounts) external {

@@ -44,8 +44,8 @@ contract OrderHelperFactory {
     address internal immutable HELPER_IMPLEMENTATION;
     address public immutable AAVE_LENDING_POOL;
 
-    // owner -> contract -> bool
-    mapping(address => mapping(address => bool)) preApprovedContracts;
+    // owner -> orderHelper instance -> order digest -> bool
+    //mapping(address => mapping(address => mapping(bytes32 => bool))) preSignedOrders;
 
     constructor(address _helperImplementation, address _aaveLendingPool) {
         HELPER_IMPLEMENTATION = _helperImplementation;
@@ -128,28 +128,15 @@ contract OrderHelperFactory {
         }
     }
 
-    function setPreApprovedContracts(address _helper) external {
-        preApprovedContracts[msg.sender][_helper] = true;
-    }
-
-    function isPresigned() external view returns (bool) {
-        IOrderHelper _helper = IOrderHelper(msg.sender);
-        if (_predeterministicAddressFromHelper(_helper) != address(_helper)) {
-            return false;
-        }
-
-        return preApprovedContracts[_helper.owner()][msg.sender];
-    }
-
     function transferFromOwner(address _token, uint256 _amount) external {
         IOrderHelper _helper = IOrderHelper(msg.sender);
         if (_predeterministicAddressFromHelper(_helper) != address(_helper)) {
             revert FactoryErrors.BadHelper();
         }
 
-        if (!preApprovedContracts[_helper.owner()][address(_helper)]) {
-            revert FactoryErrors.OwnerDidNotApproveTransfer();
-        }
+        // if (!preApprovedContracts[_helper.owner()][address(_helper)]) {
+        //     revert FactoryErrors.OwnerDidNotApproveTransfer();
+        // }
 
         IERC20(_token).transferFrom(_helper.owner(), address(_helper), _amount);
     }

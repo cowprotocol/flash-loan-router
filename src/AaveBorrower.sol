@@ -6,12 +6,22 @@ import {Borrower} from "./mixin/Borrower.sol";
 import {IAaveFlashLoanReceiver} from "./vendored/IAaveFlashLoanReceiver.sol";
 import {IAavePool} from "./vendored/IAavePool.sol";
 import {IERC20} from "./vendored/IERC20.sol";
+import {SafeERC20} from "./vendored/SafeERC20.sol";
+
+library AaveBorrowerError {
+    error AlreadyTakenOut();
+    error NotTakenOut();
+}
 
 /// @title Aave Borrower
 /// @author CoW DAO developers
 /// @notice A borrower contract for the flash-loan router that adds support for
 /// Aave protocol.
 contract AaveBorrower is Borrower, IAaveFlashLoanReceiver {
+    using SafeERC20 for IERC20;
+
+    mapping(address => mapping(IERC20 => uint256)) public open;
+
     /// @param _router The router supported by this contract.
     constructor(IFlashLoanRouter _router) Borrower(_router) {}
 
@@ -51,5 +61,24 @@ contract AaveBorrower is Borrower, IAaveFlashLoanReceiver {
     ) external returns (bool) {
         flashLoanCallBack(callBackData);
         return true;
+    }
+
+    function takeOut(address _user, IERC20 _token, uint256 _amount) external onlySettlementContract {
+        if (open[_user][_token] != 0) {
+            revert AaveBorrowerError.AlreadyTakenOut();
+        }
+
+        open[_user][_token] = _amount;
+        _token.transfer(_user, _amount);
+    }
+
+    function payBack(address _user, IERC20 _token) external {
+        uint256 _amount = open[_user][_token];
+        if (_amount == 0) {
+            revert AaveBorrowerError.NotTakenOut();
+        }
+
+        open[_user][_token] = 0;
+        _token.transferFrom(_user, address(this), _amount);
     }
 }

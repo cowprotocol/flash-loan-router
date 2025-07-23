@@ -6,7 +6,8 @@ import {IBorrower, ICowSettlement, IERC20} from "src/interface/IBorrower.sol";
 import {TokenBalanceAccumulator} from "./TokenBalanceAccumulator.sol";
 
 interface IOrderHelper {
-    function swapCollateral() external;
+    function preHook() external;
+    function postHook() external;
 }
 
 interface IOrderHelperFactory {
@@ -20,6 +21,11 @@ interface IOrderHelperFactory {
         uint32 _validTo,
         uint256 _flashloanFee
     ) external returns (address orderHelperAddress);
+}
+
+// TODO: should this be part of IBorrower?
+interface IAaveBorrower {
+    function takeOut(address _user, IERC20 _token, uint256 _amount) external;
 }
 
 library CowProtocolInteraction {
@@ -47,6 +53,18 @@ library CowProtocolInteraction {
         });
     }
 
+    function takeOut(address _borrower, address _user, IERC20 _token, uint256 _amount)
+        internal
+        pure
+        returns (ICowSettlement.Interaction memory)
+    {
+        return ICowSettlement.Interaction({
+            target: address(_borrower),
+            value: 0,
+            callData: abi.encodeCall(IAaveBorrower.takeOut, (_user, _token, _amount))
+        });
+    }
+
     function borrowerApprove(IBorrower borrower, IERC20 token, address spender, uint256 amount)
         internal
         pure
@@ -71,11 +89,19 @@ library CowProtocolInteraction {
         });
     }
 
-    function orderHelperSwapCollateral(address helper) internal pure returns (ICowSettlement.Interaction memory) {
+    function orderHelperPreHook(address helper) internal pure returns (ICowSettlement.Interaction memory) {
         return ICowSettlement.Interaction({
             target: address(helper),
             value: 0,
-            callData: abi.encodeCall(IOrderHelper.swapCollateral, ())
+            callData: abi.encodeCall(IOrderHelper.preHook, ())
+        });
+    }
+
+    function orderHelperPostHook(address helper) internal pure returns (ICowSettlement.Interaction memory) {
+        return ICowSettlement.Interaction({
+            target: address(helper),
+            value: 0,
+            callData: abi.encodeCall(IOrderHelper.postHook, ())
         });
     }
 
