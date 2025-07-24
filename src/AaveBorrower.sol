@@ -69,16 +69,16 @@ contract AaveBorrower is Borrower, IAaveFlashLoanReceiver {
         }
 
         open[_user][_token] = _amount;
-        _token.transfer(_user, _amount);
+        _token.safeTransfer(_user, _amount);
     }
 
-    function payBack(address _user, IERC20 _token) external {
-        uint256 _amount = open[_user][_token];
+    function payBack(IERC20 _token) external {
+        uint256 _amount = open[msg.sender][_token];
         if (_amount == 0) {
             revert AaveBorrowerError.NotTakenOut();
         }
 
-        open[_user][_token] = 0;
-        _token.transferFrom(_user, address(this), _amount);
+        open[msg.sender][_token] = 0;
+        _token.safeTransferFrom(msg.sender, address(this), _amount);
     }
 }

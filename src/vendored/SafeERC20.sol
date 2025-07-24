@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT
-
 // Vendored from OpenZeppelin contracts with minor modifications:
 // - Formatted code.
 // - Replaced imports with vendored versions.
@@ -7,6 +5,9 @@
 //   `forceApprove`.
 // <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v5.2/contracts/token/ERC20/utils/SafeERC20.sol>
 // Note: v5.2 points to commit acd4ff74de833399287ed6b31b4debf6b2b35527.
+
+// SPDX-License-Identifier: MIT
+// OpenZeppelin Contracts (last updated v5.2.0) (token/ERC20/utils/SafeERC20.sol)
 
 pragma solidity ^0.8.20;
 
@@ -26,6 +27,60 @@ library SafeERC20 {
      * @dev An operation with an ERC-20 token failed.
      */
     error SafeERC20FailedOperation(address token);
+
+    /**
+     * @dev Indicates a failed `decreaseAllowance` request.
+     */
+    error SafeERC20FailedDecreaseAllowance(address spender, uint256 currentAllowance, uint256 requestedDecrease);
+
+    /**
+     * @dev Transfer `value` amount of `token` from the calling contract to `to`. If `token` returns no value,
+     * non-reverting calls are assumed to be successful.
+     */
+    function safeTransfer(IERC20 token, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeCall(token.transfer, (to, value)));
+    }
+
+    /**
+     * @dev Transfer `value` amount of `token` from `from` to `to`, spending the approval given by `from` to the
+     * calling contract. If `token` returns no value, non-reverting calls are assumed to be successful.
+     */
+    function safeTransferFrom(IERC20 token, address from, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeCall(token.transferFrom, (from, to, value)));
+    }
+
+    /**
+     * @dev Increase the calling contract's allowance toward `spender` by `value`. If `token` returns no value,
+     * non-reverting calls are assumed to be successful.
+     *
+     * IMPORTANT: If the token implements ERC-7674 (ERC-20 with temporary allowance), and if the "client"
+     * smart contract uses ERC-7674 to set temporary allowances, then the "client" smart contract should avoid using
+     * this function. Performing a {safeIncreaseAllowance} or {safeDecreaseAllowance} operation on a token contract
+     * that has a non-zero temporary allowance (for that particular owner-spender) will result in unexpected behavior.
+     */
+    function safeIncreaseAllowance(IERC20 token, address spender, uint256 value) internal {
+        uint256 oldAllowance = token.allowance(address(this), spender);
+        forceApprove(token, spender, oldAllowance + value);
+    }
+
+    /**
+     * @dev Decrease the calling contract's allowance toward `spender` by `requestedDecrease`. If `token` returns no
+     * value, non-reverting calls are assumed to be successful.
+     *
+     * IMPORTANT: If the token implements ERC-7674 (ERC-20 with temporary allowance), and if the "client"
+     * smart contract uses ERC-7674 to set temporary allowances, then the "client" smart contract should avoid using
+     * this function. Performing a {safeIncreaseAllowance} or {safeDecreaseAllowance} operation on a token contract
+     * that has a non-zero temporary allowance (for that particular owner-spender) will result in unexpected behavior.
+     */
+    function safeDecreaseAllowance(IERC20 token, address spender, uint256 requestedDecrease) internal {
+        unchecked {
+            uint256 currentAllowance = token.allowance(address(this), spender);
+            if (currentAllowance < requestedDecrease) {
+                revert SafeERC20FailedDecreaseAllowance(spender, currentAllowance, requestedDecrease);
+            }
+            forceApprove(token, spender, currentAllowance - requestedDecrease);
+        }
+    }
 
     /**
      * @dev Set the calling contract's allowance toward `spender` to `value`. If `token` returns no value,

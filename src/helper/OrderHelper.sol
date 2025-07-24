@@ -22,7 +22,7 @@ interface IAaveToken {
 }
 
 interface IAaveBorrower {
-    function payBack(address _user, IERC20 _token) external;
+    function payBack(IERC20 _token) external;
 }
 
 library OrderHelperError {
@@ -201,7 +201,7 @@ contract OrderHelper is Initializable {
         IOrderFactory(factory).transferFromOwner(address(oldCollateralAToken), oldCollateralAmount);
         IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, address(this));
 
-        borrower.payBack(address(this), oldCollateral);
+        borrower.payBack(oldCollateral);
 
         // For now we will pay the flashloan fee from the order itself, but this should be taken care by solvers
         IERC20(oldCollateral).transfer(address(borrower), flashloanFee);
