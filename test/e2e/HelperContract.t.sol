@@ -183,11 +183,14 @@ contract E2eHelperContract is Test {
 
             ICowSettlement.Trade[] memory trades = new ICowSettlement.Trade[](1);
 
-            bytes32 domainSeparator = IPreSignTarget(address(Constants.SETTLEMENT_CONTRACT)).domainSeparator();
-            bytes32 orderDigest = order.hash(domainSeparator);
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(userKey, orderDigest);
-            bytes memory userSignature = abi.encodePacked(r, s, v);
-            bytes memory signature = abi.encode(order, userSignature);
+            bytes memory signature;
+            {
+                bytes32 domainSeparator = IPreSignTarget(address(Constants.SETTLEMENT_CONTRACT)).domainSeparator();
+                bytes32 orderDigest = order.hash(domainSeparator);
+                (uint8 v, bytes32 r, bytes32 s) = vm.sign(userKey, orderDigest);
+                bytes memory userSignature = abi.encodePacked(r, s, v);
+                signature = abi.encode(order, userSignature);
+            }
             trades[0] = deriveEip1271Trade(order, awethIndex, adaiIndex, _helperAddress, signature);
 
             ICowSettlement.Interaction[][3] memory interactions =
