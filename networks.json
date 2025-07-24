@@ -35,6 +35,10 @@
     "8453": {
       "address": "0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A",
       "transactionHash": "0x987f2a33606cf40763d3af0fa31eb230164979a353710a5ae343d0ddf74f6409"
+    },
+    "232": {
+      "address": "0x7d9c4dee56933151bc5c909cfe09def0d315cb4a",
+      "transactionHash": "0xc848728231cbdb4ec3357b15f72110fe917b0df13757ae9159bfd36c5a13b355"
     }
   },
   "ERC3156Borrower": {
@@ -73,6 +77,10 @@
     "8453": {
       "address": "0x47d71b4b3336ab2729436186c216955f3c27cd04",
       "transactionHash": "0xf5d4411eb73e464e8c12c9df9c5917d8302a2ad5a4de98cea1a8cddc61be3fa6"
+    },
+    "232": {
+      "address": "0x47d71b4b3336ab2729436186c216955f3c27cd04",
+      "transactionHash": "0xfb19da501e4a3c874d1cf1458a277cf56846347181a7e25974260f21015ff497"
     }
   },
   "FlashLoanRouter": {
@@ -111,6 +119,10 @@
     "8453": {
       "address": "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
       "transactionHash": "0x73cc7cc3335a034def2ea7aa7cdc7ed74c0b66711760244765e671dbf8e0e6a3"
+    },
+    "232": {
+      "address": "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
+      "transactionHash": "0xe162007fa0e73c290e08b811f5b9144634a72551973ff299bd7b1c3e7d09d63b"
     }
   }
 }
