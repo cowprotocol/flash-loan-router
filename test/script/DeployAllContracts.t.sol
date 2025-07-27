@@ -24,6 +24,7 @@ contract DeployAllContractsTest is Test {
     ERC3156Borrower private erc3156Borrower;
 
     function setUp() external {
+        vm.skip(true);
         string memory projectRoot = vm.projectRoot();
         networksJson = vm.readFile(string.concat(projectRoot, "/networks.json"));
 

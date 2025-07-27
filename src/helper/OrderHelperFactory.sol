@@ -138,7 +138,7 @@ contract OrderHelperFactory {
         //     revert FactoryErrors.OwnerDidNotApproveTransfer();
         // }
 
-        IERC20(_token).transferFrom(_helper.owner(), address(_helper), _amount);
+        IERC20(_token).safeTransferFrom(_helper.owner(), address(_helper), _amount);
     }
 
     function _predeterministicAddressFromHelper(IOrderHelper _helper) internal view returns (address) {

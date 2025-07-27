@@ -26,6 +26,7 @@ interface IOrderHelperFactory {
 // TODO: should this be part of IBorrower?
 interface IAaveBorrower {
     function takeOut(address _user, IERC20 _token, uint256 _amount) external;
+    function payBack(address _user, IERC20 _token) external;
 }
 
 library CowProtocolInteraction {
@@ -62,6 +63,18 @@ library CowProtocolInteraction {
             target: address(_borrower),
             value: 0,
             callData: abi.encodeCall(IAaveBorrower.takeOut, (_user, _token, _amount))
+        });
+    }
+
+    function payBack(address _borrower, address _user, IERC20 _token)
+        internal
+        pure
+        returns (ICowSettlement.Interaction memory)
+    {
+        return ICowSettlement.Interaction({
+            target: address(_borrower),
+            value: 0,
+            callData: abi.encodeCall(IAaveBorrower.payBack, (_user, _token))
         });
     }
 

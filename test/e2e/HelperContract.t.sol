@@ -70,7 +70,7 @@ contract E2eHelperContract is Test {
 
         OrderHelper helper = OrderHelper(_clone);
         assertEq(helper.owner(), user);
-        assertEq(address(helper.borrower()), address(borrower));
+        assertEq(helper.borrower(), address(borrower));
         assertEq(address(helper.oldCollateral()), address(Constants.WETH));
         assertEq(address(helper.oldCollateralAToken()), address(Constants.AWETH));
         assertEq(helper.oldCollateralAmount(), 10 ether);
@@ -140,12 +140,12 @@ contract E2eHelperContract is Test {
         });
 
         ICowSettlement.Interaction[] memory preInteractions = new ICowSettlement.Interaction[](3);
-        ICowSettlement.Interaction[] memory postInteractions = new ICowSettlement.Interaction[](2);
+        ICowSettlement.Interaction[] memory postInteractions = new ICowSettlement.Interaction[](3);
 
-        // PRE-0) Driver calls borrower.takeOut()
+        // PRE-0) (Driver injected) settlement calls borrower.takeOut()
         preInteractions[0] = CowProtocolInteraction.takeOut(address(borrower), _helperAddress, Constants.WETH, 10 ether);
 
-        // PRE-1) Deploy the helper instance
+        // PRE-1) (Order prehook)Deploy the helper instance
         preInteractions[1] = CowProtocolInteraction.deployOrderHelper(
             address(factory),
             user,
@@ -158,14 +158,17 @@ contract E2eHelperContract is Test {
             _flashloanFee
         );
 
-        // PRE-2) Order helper preHook()
+        // PRE-2) (Order prehook) Order helper preHook()
         preInteractions[2] = CowProtocolInteraction.orderHelperPreHook(_helperAddress);
 
-        // POST-1) Call helper.postHook()
+        // POST-1) (Order posthook) Call helper.postHook()
         postInteractions[0] = CowProtocolInteraction.orderHelperPostHook(_helperAddress);
 
-        // POST-2) Borrower needs to approve the pool so the flashloan tokens + fees can be pulled out
-        postInteractions[1] = CowProtocolInteraction.borrowerApprove(
+        // POST-2) (Driver injected) settlement calls borrower.payBack
+        postInteractions[1] = CowProtocolInteraction.payBack(address(borrower), _helperAddress, Constants.WETH);
+
+        // POST-3) (Driver injected) Borrower needs to approve the pool so the flashloan tokens + fees can be pulled out
+        postInteractions[2] = CowProtocolInteraction.borrowerApprove(
             borrower, Constants.WETH, address(AAVE_POOL), 10 ether + _flashloanFee
         );
 

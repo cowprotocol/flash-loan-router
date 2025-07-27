@@ -21,10 +21,6 @@ interface IAaveToken {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
-interface IAaveBorrower {
-    function payBack(IERC20 _token) external;
-}
-
 library OrderHelperError {
     error BadParameters();
     error PreHookNotCalled();
@@ -59,7 +55,7 @@ contract OrderHelper is Initializable {
     address public AAVE_LENDING_POOL;
 
     address public owner;
-    IAaveBorrower public borrower;
+    address public borrower;
     IERC20 public oldCollateral;
     IERC20 public oldCollateralAToken;
     uint256 public oldCollateralAmount;
@@ -92,7 +88,7 @@ contract OrderHelper is Initializable {
         }
 
         owner = _owner;
-        borrower = IAaveBorrower(_borrower);
+        borrower = _borrower;
         oldCollateral = IERC20(_oldCollateral);
         newCollateral = IERC20(_newCollateral);
         oldCollateralAmount = _oldCollateralAmount;
@@ -107,9 +103,6 @@ contract OrderHelper is Initializable {
 
         // Approve the _oldCollateral AToken for the swap
         IERC20(oldCollateralAToken).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
-
-        // Approve the old collateral to deposit into aave in the prehook
-        IERC20(_oldCollateral).forceApprove(AAVE_LENDING_POOL, type(uint256).max);
 
         // The system will pull the old collateral to payback the flash loan
         IERC20(_oldCollateral).forceApprove(_borrower, type(uint256).max);
@@ -127,6 +120,8 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.NotEnoughOldCollateral();
         }
 
+        // Approve and deposit the old collateral into aave
+        IERC20(oldCollateral).forceApprove(AAVE_LENDING_POOL, oldCollateralAmount);
         IAavePool(AAVE_LENDING_POOL).supply(address(oldCollateral), oldCollateralAmount, address(this), 0);
     }
 
@@ -201,10 +196,8 @@ contract OrderHelper is Initializable {
         IOrderFactory(factory).transferFromOwner(address(oldCollateralAToken), oldCollateralAmount);
         IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, address(this));
 
-        borrower.payBack(oldCollateral);
-
         // For now we will pay the flashloan fee from the order itself, but this should be taken care by solvers
-        IERC20(oldCollateral).transfer(address(borrower), flashloanFee);
+        IERC20(oldCollateral).safeTransfer(borrower, flashloanFee);
     }
 
     function sweep(address[] calldata _tokens, uint256[] calldata _amounts) external {
