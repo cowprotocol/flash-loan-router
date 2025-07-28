@@ -4,7 +4,9 @@ pragma solidity ^0.8;
 import {Test, Vm} from "forge-std/Test.sol";
 
 import {AaveBorrower, IAavePool} from "src/AaveBorrower.sol";
+
 import {FlashLoanRouter, Loan} from "src/FlashLoanRouter.sol";
+import {FlashLoanTracker} from "src/FlashLoanTracker.sol";
 
 import {GPv2Order, IERC20} from "src/helper/GPv2Order.sol";
 import {ISettlement} from "src/helper/ISettlement.sol";
@@ -36,6 +38,7 @@ contract E2eHelperContract is Test {
     AaveBorrower private borrower;
     FlashLoanRouter private router;
     OrderHelperFactory private factory;
+    FlashLoanTracker private tracker;
 
     function setUp() external {
         vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
@@ -44,13 +47,18 @@ contract E2eHelperContract is Test {
         CowProtocol.addSolver(vm, solver);
         CowProtocol.addSolver(vm, address(router));
         borrower = new AaveBorrower(router);
+        tracker = new FlashLoanTracker(address(borrower), Constants.SETTLEMENT_CONTRACT);
 
-        ICowSettlement.Interaction[] memory onlyApprove = new ICowSettlement.Interaction[](1);
-        onlyApprove[0] = CowProtocolInteraction.borrowerApprove(
-            borrower, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
-        );
+        ICowSettlement.Interaction[] memory approveInteractions = new ICowSettlement.Interaction[](1);
+
+        // approveInteractions[0] = CowProtocolInteraction.borrowerApprove(
+        //     borrower, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
+        // );
+        approveInteractions[0] =
+            CowProtocolInteraction.borrowerApprove(borrower, Constants.WETH, address(tracker), type(uint256).max);
+
         vm.prank(solver);
-        CowProtocol.emptySettleWithInteractions(onlyApprove);
+        CowProtocol.emptySettleWithInteractions(approveInteractions);
         factory = new OrderHelperFactory(address(new OrderHelper()), address(AAVE_POOL));
 
         deal(address(Constants.WETH), user, 100 ether);
@@ -59,7 +67,7 @@ contract E2eHelperContract is Test {
     function test_orderHelperFactory() external {
         address _clone = factory.deployOrderHelper(
             user,
-            address(borrower),
+            address(tracker),
             address(Constants.WETH),
             10 ether,
             address(Constants.DAI),
@@ -70,7 +78,7 @@ contract E2eHelperContract is Test {
 
         OrderHelper helper = OrderHelper(_clone);
         assertEq(helper.owner(), user);
-        assertEq(helper.borrower(), address(borrower));
+        assertEq(helper.tracker(), address(tracker));
         assertEq(address(helper.oldCollateral()), address(Constants.WETH));
         assertEq(address(helper.oldCollateralAToken()), address(Constants.AWETH));
         assertEq(helper.oldCollateralAmount(), 10 ether);
@@ -96,7 +104,7 @@ contract E2eHelperContract is Test {
         // Get the predeterministic order helper address. Contract will be deployed in a hook
         address _helperAddress = factory.getOrderHelperAddress(
             user,
-            address(borrower),
+            address(tracker),
             address(Constants.WETH),
             10 ether,
             address(Constants.DAI),
@@ -142,14 +150,14 @@ contract E2eHelperContract is Test {
         ICowSettlement.Interaction[] memory preInteractions = new ICowSettlement.Interaction[](3);
         ICowSettlement.Interaction[] memory postInteractions = new ICowSettlement.Interaction[](3);
 
-        // PRE-0) (Driver injected) settlement calls borrower.takeOut()
-        preInteractions[0] = CowProtocolInteraction.takeOut(address(borrower), _helperAddress, Constants.WETH, 10 ether);
+        // PRE-0) (Driver injected) settlement calls tracker.takeOut()
+        preInteractions[0] = CowProtocolInteraction.takeOut(address(tracker), _helperAddress, Constants.WETH, 10 ether);
 
         // PRE-1) (Order prehook)Deploy the helper instance
         preInteractions[1] = CowProtocolInteraction.deployOrderHelper(
             address(factory),
             user,
-            address(borrower),
+            address(tracker),
             address(Constants.WETH),
             10 ether,
             address(Constants.DAI),
@@ -164,8 +172,8 @@ contract E2eHelperContract is Test {
         // POST-1) (Order posthook) Call helper.postHook()
         postInteractions[0] = CowProtocolInteraction.orderHelperPostHook(_helperAddress);
 
-        // POST-2) (Driver injected) settlement calls borrower.payBack
-        postInteractions[1] = CowProtocolInteraction.payBack(address(borrower), _helperAddress, Constants.WETH);
+        // POST-2) (Driver injected) settlement calls tracker.payBack
+        postInteractions[1] = CowProtocolInteraction.payBack(address(tracker), _helperAddress, Constants.WETH);
 
         // POST-3) (Driver injected) Borrower needs to approve the pool so the flashloan tokens + fees can be pulled out
         postInteractions[2] = CowProtocolInteraction.borrowerApprove(

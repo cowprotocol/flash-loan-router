@@ -21,6 +21,10 @@ interface IAaveToken {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
+interface IFlashLoanTracker {
+    function borrower() external view returns (address);
+}
+
 library OrderHelperError {
     error BadParameters();
     error PreHookNotCalled();
@@ -55,7 +59,7 @@ contract OrderHelper is Initializable {
     address public AAVE_LENDING_POOL;
 
     address public owner;
-    address public borrower;
+    address public tracker;
     IERC20 public oldCollateral;
     IERC20 public oldCollateralAToken;
     uint256 public oldCollateralAmount;
@@ -69,7 +73,7 @@ contract OrderHelper is Initializable {
 
     function initialize(
         address _owner,
-        address _borrower,
+        address _tracker,
         address _oldCollateral,
         uint256 _oldCollateralAmount,
         address _newCollateral,
@@ -88,7 +92,7 @@ contract OrderHelper is Initializable {
         }
 
         owner = _owner;
-        borrower = _borrower;
+        tracker = _tracker;
         oldCollateral = IERC20(_oldCollateral);
         newCollateral = IERC20(_newCollateral);
         oldCollateralAmount = _oldCollateralAmount;
@@ -105,7 +109,7 @@ contract OrderHelper is Initializable {
         IERC20(oldCollateralAToken).forceApprove(ISettlement(SETTLEMENT).vaultRelayer(), type(uint256).max);
 
         // The system will pull the old collateral to payback the flash loan
-        IERC20(_oldCollateral).forceApprove(_borrower, type(uint256).max);
+        IERC20(oldCollateral).forceApprove(tracker, type(uint256).max);
     }
 
     // Prehook will take care of depositing the flash loan amount into aave
@@ -197,7 +201,7 @@ contract OrderHelper is Initializable {
         IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, address(this));
 
         // For now we will pay the flashloan fee from the order itself, but this should be taken care by solvers
-        IERC20(oldCollateral).safeTransfer(borrower, flashloanFee);
+        IERC20(oldCollateral).safeTransfer(IFlashLoanTracker(tracker).borrower(), flashloanFee);
     }
 
     function sweep(address[] calldata _tokens, uint256[] calldata _amounts) external {

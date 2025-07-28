@@ -8,7 +8,7 @@ import {Clones} from "./Clones.sol";
 interface IOrderHelper {
     function initialize(
         address _owner,
-        address _borrower,
+        address _tracker,
         address _oldCollateral,
         uint256 _oldCollateralAmount,
         address _newCollateral,
@@ -19,7 +19,7 @@ interface IOrderHelper {
     ) external;
 
     function owner() external view returns (address);
-    function borrower() external view returns (address);
+    function tracker() external view returns (address);
     function oldCollateral() external view returns (address);
     function oldCollateralAmount() external view returns (uint256);
     function newCollateral() external view returns (address);
@@ -58,7 +58,7 @@ contract OrderHelperFactory {
 
     function getOrderHelperAddress(
         address _owner,
-        address _borrower,
+        address _tracker,
         address _oldCollateral,
         uint256 _oldCollateralAmount,
         address _newCollateral,
@@ -69,7 +69,7 @@ contract OrderHelperFactory {
         bytes32 _salt = keccak256(
             abi.encode(
                 _owner,
-                _borrower,
+                _tracker,
                 _oldCollateral,
                 _oldCollateralAmount,
                 _newCollateral,
@@ -83,7 +83,7 @@ contract OrderHelperFactory {
 
     function deployOrderHelper(
         address _owner,
-        address _borrower,
+        address _tracker,
         address _oldCollateral,
         uint256 _oldCollateralAmount,
         address _newCollateral,
@@ -94,7 +94,7 @@ contract OrderHelperFactory {
         bytes32 _salt = keccak256(
             abi.encode(
                 _owner,
-                _borrower,
+                _tracker,
                 _oldCollateral,
                 _oldCollateralAmount,
                 _newCollateral,
@@ -113,7 +113,7 @@ contract OrderHelperFactory {
 
         try IOrderHelper(orderHelperAddress).initialize(
             _owner,
-            _borrower,
+            _tracker,
             _oldCollateral,
             _oldCollateralAmount,
             _newCollateral,
@@ -144,7 +144,7 @@ contract OrderHelperFactory {
     function _predeterministicAddressFromHelper(IOrderHelper _helper) internal view returns (address) {
         return getOrderHelperAddress(
             _helper.owner(),
-            _helper.borrower(),
+            _helper.tracker(),
             _helper.oldCollateral(),
             _helper.oldCollateralAmount(),
             _helper.newCollateral(),
