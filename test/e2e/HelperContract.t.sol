@@ -50,10 +50,6 @@ contract E2eHelperContract is Test {
         tracker = new FlashLoanTracker(address(borrower), Constants.SETTLEMENT_CONTRACT);
 
         ICowSettlement.Interaction[] memory approveInteractions = new ICowSettlement.Interaction[](1);
-
-        // approveInteractions[0] = CowProtocolInteraction.borrowerApprove(
-        //     borrower, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
-        // );
         approveInteractions[0] =
             CowProtocolInteraction.borrowerApprove(borrower, Constants.WETH, address(tracker), type(uint256).max);
 
@@ -115,10 +111,8 @@ contract E2eHelperContract is Test {
 
         // User approvals and pre-actions
         vm.startPrank(user);
-        // Approve the helper factory to pull the atokens
-        Constants.AWETH.approve(address(factory), 10 ether);
-        // Presign the helper
-        //factory.setPreApprovedContracts(_helperAddress);
+        // Approve the helper address to pull the atokens
+        Constants.AWETH.approve(address(_helperAddress), 10 ether);
         vm.stopPrank();
 
         // Ensure there are 2.5k ADAI in the settlement contract so the trade works

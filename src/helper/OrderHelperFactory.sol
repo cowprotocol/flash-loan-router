@@ -44,9 +44,6 @@ contract OrderHelperFactory {
     address internal immutable HELPER_IMPLEMENTATION;
     address public immutable AAVE_LENDING_POOL;
 
-    // owner -> orderHelper instance -> order digest -> bool
-    //mapping(address => mapping(address => mapping(bytes32 => bool))) preSignedOrders;
-
     constructor(address _helperImplementation, address _aaveLendingPool) {
         HELPER_IMPLEMENTATION = _helperImplementation;
         if (HELPER_IMPLEMENTATION.code.length == 0) {
@@ -126,31 +123,5 @@ contract OrderHelperFactory {
         } catch {
             revert FactoryErrors.OrderHelperDeploymentFailed();
         }
-    }
-
-    function transferFromOwner(address _token, uint256 _amount) external {
-        IOrderHelper _helper = IOrderHelper(msg.sender);
-        if (_predeterministicAddressFromHelper(_helper) != address(_helper)) {
-            revert FactoryErrors.BadHelper();
-        }
-
-        // if (!preApprovedContracts[_helper.owner()][address(_helper)]) {
-        //     revert FactoryErrors.OwnerDidNotApproveTransfer();
-        // }
-
-        IERC20(_token).safeTransferFrom(_helper.owner(), address(_helper), _amount);
-    }
-
-    function _predeterministicAddressFromHelper(IOrderHelper _helper) internal view returns (address) {
-        return getOrderHelperAddress(
-            _helper.owner(),
-            _helper.tracker(),
-            _helper.oldCollateral(),
-            _helper.oldCollateralAmount(),
-            _helper.newCollateral(),
-            _helper.minSupplyAmount(),
-            _helper.validTo(),
-            _helper.flashloanFee()
-        );
     }
 }

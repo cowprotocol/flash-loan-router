@@ -12,13 +12,7 @@ import {SafeTransfer} from "./SafeTransfer.sol";
 import {SignatureChecker} from "./SignatureChecker.sol";
 
 interface IOrderFactory {
-    function transferFromOwner(address _token, uint256 _amount) external;
-    function isPresigned() external view returns (bool);
     function AAVE_LENDING_POOL() external view returns (address);
-}
-
-interface IAaveToken {
-    function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
 interface IFlashLoanTracker {
@@ -197,7 +191,7 @@ contract OrderHelper is Initializable {
         }
 
         // After the swap the owner's oldCollateral is unlocked, move here to unwrap and pay the flashloan
-        IOrderFactory(factory).transferFromOwner(address(oldCollateralAToken), oldCollateralAmount);
+        oldCollateralAToken.safeTransferFrom(owner, address(this), oldCollateralAmount);
         IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, address(this));
 
         // For now we will pay the flashloan fee from the order itself, but this should be taken care by solvers
