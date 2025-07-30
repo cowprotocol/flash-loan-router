@@ -15,6 +15,7 @@ interface IOrderHelper {
         uint256 _minSupplyAmount,
         uint32 _validTo,
         uint256 _flashloanFee,
+        address _flashloanPayee,
         address _factory
     ) external;
 
@@ -61,7 +62,8 @@ contract OrderHelperFactory {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        uint256 _flashloanFee
+        uint256 _flashloanFee,
+        address _flashloanPayee
     ) public view returns (address orderHelperAddress) {
         bytes32 _salt = keccak256(
             abi.encode(
@@ -72,7 +74,8 @@ contract OrderHelperFactory {
                 _newCollateral,
                 _minSupplyAmount,
                 _validTo,
-                _flashloanFee
+                _flashloanFee,
+                _flashloanPayee
             )
         );
         orderHelperAddress = Clones.predictDeterministicAddress(HELPER_IMPLEMENTATION, _salt, address(this));
@@ -86,7 +89,8 @@ contract OrderHelperFactory {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        uint256 _flashloanFee
+        uint256 _flashloanFee,
+        address _flashloanPayee
     ) external returns (address orderHelperAddress) {
         bytes32 _salt = keccak256(
             abi.encode(
@@ -97,7 +101,8 @@ contract OrderHelperFactory {
                 _newCollateral,
                 _minSupplyAmount,
                 _validTo,
-                _flashloanFee
+                _flashloanFee,
+                _flashloanPayee
             )
         );
         orderHelperAddress = Clones.predictDeterministicAddress(HELPER_IMPLEMENTATION, _salt, address(this));
@@ -117,6 +122,7 @@ contract OrderHelperFactory {
             _minSupplyAmount,
             _validTo,
             _flashloanFee,
+            _flashloanPayee,
             address(this)
         ) {
             emit NewOrderHelper(orderHelperAddress);

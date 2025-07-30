@@ -19,14 +19,14 @@ interface IOrderHelperFactory {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        uint256 _flashloanFee
+        uint256 _flashloanFee,
+        address _flashloanPayee
     ) external returns (address orderHelperAddress);
 }
 
-// TODO: should this be part of IBorrower?
-interface IAaveBorrower {
-    function takeOut(address _user, IERC20 _token, uint256 _amount) external;
-    function payBack(address _user, IERC20 _token) external;
+interface IFlashLoanTracer {
+    function takeOut(address _borrower, address _user, IERC20 _token, uint256 _amount) external;
+    function payBack(address _borrower, address _user, IERC20 _token) external;
 }
 
 library CowProtocolInteraction {
@@ -54,27 +54,27 @@ library CowProtocolInteraction {
         });
     }
 
-    function takeOut(address _borrower, address _user, IERC20 _token, uint256 _amount)
+    function takeOut(address _tracker, address _borrower, address _user, IERC20 _token, uint256 _amount)
         internal
         pure
         returns (ICowSettlement.Interaction memory)
     {
         return ICowSettlement.Interaction({
-            target: address(_borrower),
+            target: address(_tracker),
             value: 0,
-            callData: abi.encodeCall(IAaveBorrower.takeOut, (_user, _token, _amount))
+            callData: abi.encodeCall(IFlashLoanTracer.takeOut, (_borrower, _user, _token, _amount))
         });
     }
 
-    function payBack(address _borrower, address _user, IERC20 _token)
+    function payBack(address _tracker, address _borrower, address _user, IERC20 _token)
         internal
         pure
         returns (ICowSettlement.Interaction memory)
     {
         return ICowSettlement.Interaction({
-            target: address(_borrower),
+            target: address(_tracker),
             value: 0,
-            callData: abi.encodeCall(IAaveBorrower.payBack, (_user, _token))
+            callData: abi.encodeCall(IFlashLoanTracer.payBack, (_borrower, _user, _token))
         });
     }
 
@@ -127,7 +127,8 @@ library CowProtocolInteraction {
         address _newCollateral,
         uint256 _minSupplyAmount,
         uint32 _validTo,
-        uint256 _flashloanFee
+        uint256 _flashloanFee,
+        address _flashloanPayee
     ) internal pure returns (ICowSettlement.Interaction memory) {
         return ICowSettlement.Interaction({
             target: address(factory),
@@ -142,7 +143,8 @@ library CowProtocolInteraction {
                     _newCollateral,
                     _minSupplyAmount,
                     _validTo,
-                    _flashloanFee
+                    _flashloanFee,
+                    _flashloanPayee
                 )
             )
         });

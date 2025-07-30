@@ -15,10 +15,6 @@ interface IOrderFactory {
     function AAVE_LENDING_POOL() external view returns (address);
 }
 
-interface IFlashLoanTracker {
-    function borrower() external view returns (address);
-}
-
 library OrderHelperError {
     error BadParameters();
     error PreHookNotCalled();
@@ -62,6 +58,7 @@ contract OrderHelper is Initializable {
     uint256 public minSupplyAmount;
     uint32 public validTo;
     uint256 public flashloanFee;
+    address public flashloanPayee;
     address public factory;
     uint256 transient preHookCalled;
 
@@ -74,6 +71,7 @@ contract OrderHelper is Initializable {
         uint256 _minSupplyAmount,
         uint32 _validTo,
         uint256 _flashloanFee,
+        address _flashloanPayee,
         address _factory
     ) external initializer {
         // TODO: check the other params?
@@ -93,6 +91,7 @@ contract OrderHelper is Initializable {
         minSupplyAmount = _minSupplyAmount;
         validTo = _validTo;
         flashloanFee = _flashloanFee;
+        flashloanPayee = _flashloanPayee;
         factory = _factory;
 
         AAVE_LENDING_POOL = IOrderFactory(factory).AAVE_LENDING_POOL();
@@ -194,8 +193,8 @@ contract OrderHelper is Initializable {
         oldCollateralAToken.safeTransferFrom(owner, address(this), oldCollateralAmount);
         IAavePool(AAVE_LENDING_POOL).withdraw(address(oldCollateral), type(uint256).max, address(this));
 
-        // For now we will pay the flashloan fee from the order itself, but this should be taken care by solvers
-        IERC20(oldCollateral).safeTransfer(IFlashLoanTracker(tracker).borrower(), flashloanFee);
+        // NOTE:For now we will pay the flashloan fee from the order itself, but this should be taken care by solvers
+        IERC20(oldCollateral).safeTransfer(flashloanPayee, flashloanFee);
     }
 
     function sweep(address[] calldata _tokens, uint256[] calldata _amounts) external {
