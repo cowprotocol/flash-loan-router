@@ -121,7 +121,7 @@ library CowProtocolInteraction {
     function deployOrderHelper(
         address factory,
         address _owner,
-        address _borrower,
+        address _tracker,
         address _oldCollateral,
         uint256 _oldCollateralAmount,
         address _newCollateral,
@@ -137,7 +137,7 @@ library CowProtocolInteraction {
                 IOrderHelperFactory.deployOrderHelper,
                 (
                     _owner,
-                    _borrower,
+                    _tracker,
                     _oldCollateral,
                     _oldCollateralAmount,
                     _newCollateral,
