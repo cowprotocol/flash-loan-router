@@ -203,8 +203,4 @@ forge script script/single-deployment/DeployFlashLoanRouter.s.sol:DeployFlashLoa
 
 The file [`networks.json`](./networks.json) lists all official deployments of the contracts in this repository by chain id.
 
-The deployment addresses file is generated with:
-
-```shell
-bash dev/generate-networks-file.sh > networks.json
-```
+This file needs to be updated manually, since on some chains the contract were deployed manually without the corresponding broadcast files.
