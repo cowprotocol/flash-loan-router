@@ -17,7 +17,6 @@ interface IOrderFactory {
 
 library OrderHelperError {
     error BadParameters();
-    error PreHookNotCalled();
     error OrderNotSignedByOwner();
     error OrderDoesNotMatchMessageHash();
     error BadSellToken();
@@ -35,7 +34,9 @@ library OrderHelperError {
     error NotLongerValid();
     error NotOwner();
     error InvalidWithdrawArguments();
-    error PreHookAlreadyCalled();
+    error NotEnoughNewCollateralAToken();
+    error PreHookCalledTwice();
+    error PreHookNotCalled();
 }
 
 /// @title OrderHelper
@@ -60,7 +61,7 @@ contract OrderHelper is Initializable {
     uint256 public flashloanFee;
     address public flashloanPayee;
     address public factory;
-    uint256 transient preHookCalled;
+    uint256 transient preHookCalled; // defaults to 0
 
     function initialize(
         address _owner,
@@ -108,7 +109,7 @@ contract OrderHelper is Initializable {
     // Prehook will take care of depositing the flash loan amount into aave
     function preHook() external {
         if (preHookCalled != 0) {
-            revert OrderHelperError.PreHookAlreadyCalled();
+            revert OrderHelperError.PreHookCalledTwice();
         }
         preHookCalled = 1;
 
@@ -123,10 +124,6 @@ contract OrderHelper is Initializable {
     }
 
     function isValidSignature(bytes32 _orderHash, bytes calldata _signature) external view returns (bytes4) {
-        if (preHookCalled != 1) {
-            revert OrderHelperError.PreHookNotCalled();
-        }
-
         (GPv2Order.Data memory _order, bytes memory _userSignature) = abi.decode(_signature, (GPv2Order.Data, bytes));
         if (!SignatureChecker.isValidSignatureNow(owner, _orderHash, _userSignature)) {
             revert OrderHelperError.OrderNotSignedByOwner();
@@ -153,7 +150,7 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.NotSellOrder();
         }
 
-        if (_order.receiver != owner) {
+        if (_order.receiver != address(this)) {
             revert OrderHelperError.BadReceiver();
         }
 
@@ -185,9 +182,19 @@ contract OrderHelper is Initializable {
     }
 
     function postHook() external {
-        if (preHookCalled != 1) {
+        // We need to check that the preHook was called, otherwise the order was not executed
+        // If the postHook is called in isolation, owner would be taking the limit price without the slippage.
+        if (preHookCalled == 0) {
             revert OrderHelperError.PreHookNotCalled();
         }
+
+        uint256 _newCollateralABalance = newCollateralAToken.balanceOf(address(this));
+        if (_newCollateralABalance < minSupplyAmount) {
+            revert OrderHelperError.NotEnoughNewCollateralAToken();
+        }
+
+        // If we got here, the order happened, so we send the assets to the owner.
+        newCollateralAToken.safeTransfer(owner, _newCollateralABalance);
 
         // After the swap the owner's oldCollateral is unlocked, move here to unwrap and pay the flashloan
         oldCollateralAToken.safeTransferFrom(owner, address(this), oldCollateralAmount);

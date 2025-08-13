@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import {Test, Vm} from "forge-std/Test.sol";
+import {Test, Vm, console} from "forge-std/Test.sol";
 
 import {AaveBorrower, IAavePool} from "src/AaveBorrower.sol";
 
@@ -132,7 +132,7 @@ contract E2eHelperContract is Test {
         GPv2Order.Data memory order = GPv2Order.Data({
             sellToken: Constants.AWETH,
             buyToken: Constants.ADAI,
-            receiver: user,
+            receiver: _helperAddress,
             sellAmount: 10 ether - _flashloanFee,
             buyAmount: 2_500 ether,
             validTo: type(uint32).max,
