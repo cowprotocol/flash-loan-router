@@ -150,7 +150,7 @@ contract OrderHelper is Initializable {
             revert OrderHelperError.NotSellOrder();
         }
 
-        if (_order.receiver != address(this)) {
+        if (_order.receiver != owner) {
             revert OrderHelperError.BadReceiver();
         }
 
@@ -187,14 +187,6 @@ contract OrderHelper is Initializable {
         if (preHookCalled == 0) {
             revert OrderHelperError.PreHookNotCalled();
         }
-
-        uint256 _newCollateralABalance = newCollateralAToken.balanceOf(address(this));
-        if (_newCollateralABalance < minSupplyAmount) {
-            revert OrderHelperError.NotEnoughNewCollateralAToken();
-        }
-
-        // If we got here, the order happened, so we send the assets to the owner.
-        newCollateralAToken.safeTransfer(owner, _newCollateralABalance);
 
         // After the swap the owner's oldCollateral is unlocked, move here to unwrap and pay the flashloan
         oldCollateralAToken.safeTransferFrom(owner, address(this), oldCollateralAmount);

@@ -132,7 +132,7 @@ contract E2eHelperContract is Test {
         GPv2Order.Data memory order = GPv2Order.Data({
             sellToken: Constants.AWETH,
             buyToken: Constants.ADAI,
-            receiver: _helperAddress,
+            receiver: user,
             sellAmount: 10 ether - _flashloanFee,
             buyAmount: 2_500 ether,
             validTo: type(uint32).max,
