@@ -17,7 +17,6 @@ interface IOrderFactory {
 
 library OrderHelperError {
     error BadParameters();
-    error PreHookNotCalled();
     error OrderNotSignedByOwner();
     error OrderDoesNotMatchMessageHash();
     error BadSellToken();
@@ -35,7 +34,8 @@ library OrderHelperError {
     error NotLongerValid();
     error NotOwner();
     error InvalidWithdrawArguments();
-    error PreHookAlreadyCalled();
+    error PreHookCalledTwice();
+    error PreHookNotCalled();
 }
 
 /// @title OrderHelper
@@ -60,7 +60,7 @@ contract OrderHelper is Initializable {
     uint256 public flashloanFee;
     address public flashloanPayee;
     address public factory;
-    uint256 transient preHookCalled;
+    uint256 transient preHookCalled; // defaults to 0
 
     function initialize(
         address _owner,
@@ -108,7 +108,7 @@ contract OrderHelper is Initializable {
     // Prehook will take care of depositing the flash loan amount into aave
     function preHook() external {
         if (preHookCalled != 0) {
-            revert OrderHelperError.PreHookAlreadyCalled();
+            revert OrderHelperError.PreHookCalledTwice();
         }
         preHookCalled = 1;
 
@@ -123,10 +123,6 @@ contract OrderHelper is Initializable {
     }
 
     function isValidSignature(bytes32 _orderHash, bytes calldata _signature) external view returns (bytes4) {
-        if (preHookCalled != 1) {
-            revert OrderHelperError.PreHookNotCalled();
-        }
-
         (GPv2Order.Data memory _order, bytes memory _userSignature) = abi.decode(_signature, (GPv2Order.Data, bytes));
         if (!SignatureChecker.isValidSignatureNow(owner, _orderHash, _userSignature)) {
             revert OrderHelperError.OrderNotSignedByOwner();
@@ -185,7 +181,9 @@ contract OrderHelper is Initializable {
     }
 
     function postHook() external {
-        if (preHookCalled != 1) {
+        // We need to check that the preHook was called, since if the postHook is called in isolation,
+        // owner would be withdrawing from their position and leaving it here
+        if (preHookCalled == 0) {
             revert OrderHelperError.PreHookNotCalled();
         }
 
