@@ -34,7 +34,6 @@ library OrderHelperError {
     error NotLongerValid();
     error NotOwner();
     error InvalidWithdrawArguments();
-    error NotEnoughNewCollateralAToken();
     error PreHookCalledTwice();
     error PreHookNotCalled();
 }
@@ -182,8 +181,8 @@ contract OrderHelper is Initializable {
     }
 
     function postHook() external {
-        // We need to check that the preHook was called, otherwise the order was not executed
-        // If the postHook is called in isolation, owner would be taking the limit price without the slippage.
+        // We need to check that the preHook was called, since if the postHook is called in isolation,
+        // owner would be withdrawing from their position and leaving it here
         if (preHookCalled == 0) {
             revert OrderHelperError.PreHookNotCalled();
         }
