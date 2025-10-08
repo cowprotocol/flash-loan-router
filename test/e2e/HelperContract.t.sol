@@ -46,7 +46,7 @@ contract E2eHelperContract is Test {
         router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
         CowProtocol.addSolver(vm, solver);
         CowProtocol.addSolver(vm, address(router));
-        borrower = new AaveBorrower(router);
+        borrower = new AaveBorrower(router, Constants.SOLVER_AUTHENTICATOR);
         tracker = new FlashLoanTracker(Constants.SETTLEMENT_CONTRACT);
 
         ICowSettlement.Interaction[] memory approveInteractions = new ICowSettlement.Interaction[](1);

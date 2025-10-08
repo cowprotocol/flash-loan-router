@@ -21,7 +21,7 @@ library AaveSetup {
     IAavePool internal constant WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
 
     function prepareBorrower(Vm vm, FlashLoanRouter router, address solver) internal returns (AaveBorrower borrower) {
-        borrower = new AaveBorrower(router);
+        borrower = new AaveBorrower(router, Constants.SOLVER_AUTHENTICATOR);
 
         // Call `approve` from the settlement contract so that WETH can be spent
         // on a settlement interaction on behalf of the borrower. With an

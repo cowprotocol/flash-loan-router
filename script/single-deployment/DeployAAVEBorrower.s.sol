@@ -5,6 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {AaveBorrower} from "src/AaveBorrower.sol";
 import {FlashLoanRouter} from "src/FlashLoanRouter.sol";
+import {ICowAuthentication} from "src/vendored/ICowAuthentication.sol";
 
 import {Asserts} from "../libraries/Asserts.sol";
 import {Constants} from "../libraries/Constants.sol";
@@ -40,14 +41,17 @@ contract DeployAAVEBorrower is Script {
     function deployAAVEBorrower(FlashLoanRouter flashLoanRouter) internal returns (AaveBorrower borrower) {
         Asserts.usesDefaultSettlementContract(flashLoanRouter);
 
+        ICowAuthentication authenticator = ICowAuthentication(Constants.DEFAULT_AUTHENTICATOR);
+
         address expectedAddress = vm.computeCreate2Address(
-            Constants.SALT, keccak256(abi.encodePacked(type(AaveBorrower).creationCode, abi.encode(flashLoanRouter)))
+            Constants.SALT,
+            keccak256(abi.encodePacked(type(AaveBorrower).creationCode, abi.encode(flashLoanRouter, authenticator)))
         );
 
         // Only deploy if no code exists at that address
         if (expectedAddress.code.length == 0) {
             vm.broadcast();
-            borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter);
+            borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter, authenticator);
             console.log("AaveBorrower has been deployed at:", address(borrower));
         } else {
             borrower = AaveBorrower(expectedAddress);
