@@ -14,46 +14,24 @@ import {CowWrapper, GPv2Authentication} from "./vendored/CowWrapper.sol";
 /// @author CoW DAO developers
 /// @notice A borrower contract for the flash-loan router that adds support for
 /// Aave protocol.
-contract AaveBorrower is Borrower, CowWrapper, IAaveFlashLoanReceiver {
+contract AaveBorrower is CowWrapper, IAaveFlashLoanReceiver {
     using SafeERC20 for IERC20;
 
-    /// @param _router The router supported by this contract.
-    /// @param _authentication The CoW Protocol authentication contract.
-    constructor(IFlashLoanRouter _router, ICowAuthentication _authentication)
-        Borrower(_router)
-        CowWrapper(GPv2Authentication(address(_authentication)))
-    {}
+    IAavePool public immutable LENDER;
 
-    /// @inheritdoc Borrower
-    function triggerFlashLoan(address lender, IERC20 token, uint256 amount, bytes calldata callBackData)
-        internal
-        override
+    /// @param _lender The aave lending pool supported by this contract.
+    /// @param _authentication The CoW Protocol authentication contract.
+    constructor(IAavePool _lender, ICowAuthentication _authentication)
+        CowWrapper(GPv2Authentication(address(_authentication)))
     {
-        // For documentation on the call parameters, see:
-        // <https://aave.com/docs/developers/smart-contracts/pool#write-methods-flashloan-input-parameters>
-        IAaveFlashLoanReceiver receiverAddress = this;
-        address[] memory assets = new address[](1);
-        assets[0] = address(token);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
-        uint256[] memory interestRateModes = new uint256[](1);
-        // Don't open any debt position, just revert if funds can't be
-        // transferred from this contract.
-        interestRateModes[0] = 0;
-        // The next value is technically unused, since `interestRateMode` is 0.
-        address onBehalfOf = address(this);
-        bytes calldata params = callBackData;
-        // Referral supply is currently inactive
-        uint16 referralCode = 0;
-        IAavePool(lender).flashLoan(
-            address(receiverAddress), assets, amounts, interestRateModes, onBehalfOf, params, referralCode
-        );
+        LENDER = _lender;
     }
 
     /// @inheritdoc CowWrapper
     function _wrap(bytes calldata settleData, bytes calldata wrapperData) internal override {
         uint256 len = uint256(bytes32(wrapperData[0:32]));
-        (address lender, address[] memory assets, uint256[] memory amounts) = abi.decode(wrapperData[32:32+len], (address, address[], uint256[]));
+        (address[] memory assets, uint256[] memory amounts) = abi.decode(wrapperData[32:32+len], (address[], uint256[]));
+        
         wrapperData = wrapperData[32+len:];
 
         IAaveFlashLoanReceiver receiverAddress = this;
@@ -65,22 +43,44 @@ contract AaveBorrower is Borrower, CowWrapper, IAaveFlashLoanReceiver {
         bytes memory params = abi.encode(settleData, wrapperData);
 
         uint16 referralCode = 0;
-        IAavePool(lender).flashLoan(
+
+        IAavePool(LENDER).flashLoan(
             address(receiverAddress), assets, amounts, interestRateModes, onBehalfOf, params, referralCode
         );
     }
 
+    function parseWrapperData(bytes calldata wrapperData) external override pure returns (bytes calldata) {
+        (,, wrapperData) = _parseWrapperData(wrapperData);
+
+        return wrapperData;
+    }
+
+    function _parseWrapperData(bytes calldata wrapperData) internal pure returns (address[] memory assets, uint256[] memory amounts, bytes calldata) {
+        uint256 len = uint256(bytes32(wrapperData[0:32]));
+        (assets, amounts) = abi.decode(wrapperData[32:32+len], (address[], uint256[]));
+
+        wrapperData = wrapperData[32+len:];
+
+        return (assets, amounts, wrapperData);
+    }
+
     /// @inheritdoc IAaveFlashLoanReceiver
     function executeOperation(
-        address[] calldata,
-        uint256[] calldata,
-        uint256[] calldata,
-        address,
+        address[] memory assets,
+        uint256[] memory amounts,
+        uint256[] memory premiums,
+        address initiator,
         bytes calldata callBackData
     ) external returns (bool) {
+
+        if (initiator != address(this)) {
+            return false;
+        }
+
         bytes calldata settleData;
         bytes calldata wrapperData;
 
+        // We cant use `abi.decode` because it wants to output `memory` types, so assembly it is!
         assembly {
             // callBackData is encoded as (bytes, bytes)
             // First 32 bytes: offset to first bytes
@@ -99,7 +99,28 @@ contract AaveBorrower is Borrower, CowWrapper, IAaveFlashLoanReceiver {
             wrapperData.length := secondLen
         }
 
+        // get the settlement contract we will ultimately be calling
+        address settlementContract;
+        assembly {
+            // Load the last 20 bytes as an address
+            // wrapperData is calldata, so we use calldataload
+            settlementContract := calldataload(add(wrapperData.offset, sub(wrapperData.length, 32)))
+        }
+
+        // Grant the settlement contract the approvals it will need to access the flashed funds
+        for (uint256 i = 0;i < assets.length;i++) {
+            IERC20(assets[i]).approve(settlementContract, amounts[i]);
+        }
+
         _internalSettle(settleData, wrapperData);
+
+        // There is technically a possibility that the settlement contract didnt actually pull the needed tokens
+        // For max security, just make sure we reset the approvals (maybe not ultimately necessary)
+        // And then, we approve the lender to take all the tokens it needs as repayment
+        for (uint256 i = 0;i < assets.length;i++) {
+            IERC20(assets[i]).approve(settlementContract, 0);
+            IERC20(assets[i]).approve(address(LENDER), amounts[i] + premiums[i]);
+        }
 
         return true;
     }

@@ -5,6 +5,7 @@ import {Test, Vm} from "forge-std/Test.sol";
 
 import {FlashLoanRouter, Loan} from "src/FlashLoanRouter.sol";
 import {IBorrower, ICowSettlement} from "src/interface/IBorrower.sol";
+import {CowWrapper} from "src/vendored/CowWrapper.sol";
 
 import {AaveSetup} from "./Aave.t.sol";
 import {MakerSetup} from "./Maker.t.sol";
@@ -25,7 +26,7 @@ contract E2eAaveThenMaker is Test {
 
     address private solver = makeAddr("E2eAaveThenMaker: solver");
 
-    IBorrower private aaveBorrower;
+    CowWrapper private aaveBorrower;
     IBorrower private makerBorrower;
     TokenBalanceAccumulator private tokenBalanceAccumulator;
     FlashLoanRouter private router;
@@ -36,7 +37,7 @@ contract E2eAaveThenMaker is Test {
         router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
         CowProtocol.addSolver(vm, solver);
         CowProtocol.addSolver(vm, address(router));
-        aaveBorrower = AaveSetup.prepareBorrower(vm, router, solver);
+        aaveBorrower = AaveSetup.prepareBorrower();
         makerBorrower = MakerSetup.prepareBorrower(vm, router, solver);
     }
 
@@ -53,14 +54,8 @@ contract E2eAaveThenMaker is Test {
         uint256 settlementInitialWethBalance = Constants.WETH.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
         uint256 settlementInitialDaiBalance = Constants.DAI.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
 
-        Loan.Data[] memory loans = new Loan.Data[](2);
+        Loan.Data[] memory loans = new Loan.Data[](1);
         loans[0] = Loan.Data({
-            amount: aaveLoanedAmount,
-            borrower: aaveBorrower,
-            lender: address(AaveSetup.WETH_POOL),
-            token: Constants.WETH
-        });
-        loans[1] = Loan.Data({
             amount: makerLoanedAmount,
             borrower: makerBorrower,
             lender: address(MakerSetup.FLASH_LOAN_CONTRACT),
@@ -109,22 +104,30 @@ contract E2eAaveThenMaker is Test {
 
         // Prepare the borrowers for enabling repayment of the loan.
         interactionsWithFlashLoan[6] = CowProtocolInteraction.borrowerApprove(
-            aaveBorrower, Constants.WETH, address(AaveSetup.WETH_POOL), aaveAmountWithFee
-        );
-        interactionsWithFlashLoan[7] = CowProtocolInteraction.borrowerApprove(
             makerBorrower, Constants.DAI, address(MakerSetup.FLASH_LOAN_CONTRACT), makerAmountWithFee
         );
 
         // Send back the funds to the solver borrower for repaying the loan.
-        interactionsWithFlashLoan[8] =
+        interactionsWithFlashLoan[7] =
             CowProtocolInteraction.transfer(Constants.WETH, address(aaveBorrower), aaveAmountWithFee);
-        interactionsWithFlashLoan[9] =
+        interactionsWithFlashLoan[8] =
             CowProtocolInteraction.transfer(Constants.DAI, address(makerBorrower), makerAmountWithFee);
 
         bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
+        // Prepare wrapper data for Aave borrower
+        address[] memory assets = new address[](1);
+        assets[0] = address(Constants.WETH);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = aaveLoanedAmount;
+        bytes memory encoded = abi.encode(assets, amounts);
+        bytes memory wrapperData = abi.encodePacked(encoded.length, encoded, address(router), loans.length, abi.encode(loans), Constants.SETTLEMENT_CONTRACT);
+
         vm.prank(solver);
-        router.flashLoanAndSettle(loans, settleCallData);
+        aaveBorrower.wrappedSettle(
+            abi.encodeCall(router.flashLoanAndSettle, (loans, settleCallData)),
+            wrapperData
+        );
 
         tokenBalanceAccumulator.assertAccumulatorEq(vm, expectedBalances);
     }

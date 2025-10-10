@@ -5,6 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {AaveBorrower} from "src/AaveBorrower.sol";
 import {FlashLoanRouter} from "src/FlashLoanRouter.sol";
+import {IAavePool} from "src/vendored/IAavePool.sol";
 import {ICowAuthentication} from "src/vendored/ICowAuthentication.sol";
 
 import {Asserts} from "../libraries/Asserts.sol";
@@ -43,15 +44,18 @@ contract DeployAAVEBorrower is Script {
 
         ICowAuthentication authenticator = ICowAuthentication(Constants.DEFAULT_AUTHENTICATOR);
 
+        // TODO: Get the actual Aave pool address from environment or constants
+        address aavePoolAddress = vm.envAddress("AAVE_POOL_ADDRESS");
+
         address expectedAddress = vm.computeCreate2Address(
             Constants.SALT,
-            keccak256(abi.encodePacked(type(AaveBorrower).creationCode, abi.encode(flashLoanRouter, authenticator)))
+            keccak256(abi.encodePacked(type(AaveBorrower).creationCode, abi.encode(aavePoolAddress, authenticator)))
         );
 
         // Only deploy if no code exists at that address
         if (expectedAddress.code.length == 0) {
             vm.broadcast();
-            borrower = new AaveBorrower{salt: Constants.SALT}(flashLoanRouter, authenticator);
+            borrower = new AaveBorrower{salt: Constants.SALT}(IAavePool(aavePoolAddress), authenticator);
             console.log("AaveBorrower has been deployed at:", address(borrower));
         } else {
             borrower = AaveBorrower(expectedAddress);

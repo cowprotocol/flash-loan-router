@@ -20,19 +20,8 @@ library AaveSetup {
     // https://app.aave.com/reserve-overview/?underlyingAsset=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&marketName=proto_mainnet_v3
     IAavePool internal constant WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
 
-    function prepareBorrower(Vm vm, FlashLoanRouter router, address solver) internal returns (AaveBorrower borrower) {
-        borrower = new AaveBorrower(router, Constants.SOLVER_AUTHENTICATOR);
-
-        // Call `approve` from the settlement contract so that WETH can be spent
-        // on a settlement interaction on behalf of the borrower. With an
-        // unlimited approval, this step only needs to be performed once per
-        // loaned token.
-        ICowSettlement.Interaction[] memory onlyApprove = new ICowSettlement.Interaction[](1);
-        onlyApprove[0] = CowProtocolInteraction.borrowerApprove(
-            borrower, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
-        );
-        vm.prank(solver);
-        CowProtocol.emptySettleWithInteractions(onlyApprove);
+    function prepareBorrower() internal returns (AaveBorrower borrower) {
+        borrower = new AaveBorrower(WETH_POOL, Constants.SOLVER_AUTHENTICATOR);
     }
 }
 
@@ -56,10 +45,9 @@ contract E2eAave is Test {
     function setUp() external {
         vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
         tokenBalanceAccumulator = new TokenBalanceAccumulator();
-        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+        borrower = AaveSetup.prepareBorrower();
         CowProtocol.addSolver(vm, solver);
-        CowProtocol.addSolver(vm, address(router));
-        borrower = AaveSetup.prepareBorrower(vm, router, solver);
+        CowProtocol.addSolver(vm, address(borrower));
     }
 
     function test_settleWithFlashLoan() external {
@@ -80,7 +68,7 @@ contract E2eAave is Test {
         TokenBalanceAccumulator.Balance[] memory expectedBalances = new TokenBalanceAccumulator.Balance[](3);
 
         // Start preparing the settlement interactions.
-        ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](6);
+        ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](5);
         // First, we confirm that, at the point in time of the settlement, the
         // flash loan proceeds are indeed stored in the borrower.
         interactionsWithFlashLoan[0] =
@@ -109,30 +97,23 @@ contract E2eAave is Test {
         expectedBalances[2] = TokenBalanceAccumulator.Balance(
             Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), settlementInitialWethBalance + loanedAmount
         );
-        // Fifth, prepare the flash-loan repayment. Aave makes you repay the
-        // loan by calling `transferFrom` under the assumption that the flash
-        // loan borrower holds the funds plus the expected fee and has approved
-        // its contract for withdrawing this amount.
-        interactionsWithFlashLoan[4] = CowProtocolInteraction.borrowerApprove(
-            borrower, Constants.WETH, address(AaveSetup.WETH_POOL), loanedAmount + absoluteFlashFee
-        );
         // Sixth and finally, send the funds to the borrower for repayment of
         // the loan.
-        interactionsWithFlashLoan[5] =
+        interactionsWithFlashLoan[4] =
             CowProtocolInteraction.transfer(Constants.WETH, address(borrower), loanedAmount + absoluteFlashFee);
 
-        bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
+        bytes memory settleData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
 
-        Loan.Data[] memory loans = new Loan.Data[](1);
-        loans[0] = Loan.Data({
-            amount: loanedAmount,
-            borrower: borrower,
-            lender: address(AaveSetup.WETH_POOL),
-            token: Constants.WETH
-        });
+        address[] memory assets = new address[](1);
+        uint256[] memory amounts = new uint256[](1);
+        assets[0] = address(Constants.WETH);
+        amounts[0] = loanedAmount;
+        
+        bytes memory encoded = abi.encode(assets, amounts);
+        bytes memory wrapperData = abi.encodePacked(encoded.length, encoded, Constants.SETTLEMENT_CONTRACT);
 
         vm.prank(solver);
-        router.flashLoanAndSettle(loans, settleCallData);
+        borrower.wrappedSettle(settleData, wrapperData);
 
         tokenBalanceAccumulator.assertAccumulatorEq(vm, expectedBalances);
         assertEq(

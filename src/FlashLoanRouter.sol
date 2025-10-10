@@ -7,6 +7,7 @@ import {IFlashLoanRouter} from "./interface/IFlashLoanRouter.sol";
 import {Loan} from "./library/Loan.sol";
 import {LoansWithSettlement} from "./library/LoansWithSettlement.sol";
 import {ICowAuthentication} from "./vendored/ICowAuthentication.sol";
+import {CowWrapper, GPv2Authentication} from "./vendored/CowWrapper.sol";
 import {IERC20} from "./vendored/IERC20.sol";
 
 /// @title Flash-loan Router
@@ -14,7 +15,8 @@ import {IERC20} from "./vendored/IERC20.sol";
 /// @notice Solver contract for CoW Protocol that requests flash loans before
 /// executing a settlement. Every CoW Protocol solver can call this
 /// contract to borrow the funds needed for executing a settlement.
-contract FlashLoanRouter is IFlashLoanRouter {
+/// Also implements CowWrapper interface to allow chaining with other wrappers.
+contract FlashLoanRouter is IFlashLoanRouter, CowWrapper {
     using LoansWithSettlement for bytes;
 
     /// @notice Event emitted to indicate that a settlement will be executed
@@ -64,7 +66,9 @@ contract FlashLoanRouter is IFlashLoanRouter {
 
     /// @param _settlementContract The settlement contract that this router will
     /// be supporting.
-    constructor(ICowSettlement _settlementContract) {
+    constructor(ICowSettlement _settlementContract)
+        CowWrapper(GPv2Authentication(address(_settlementContract.authenticator())))
+    {
         settlementContract = _settlementContract;
         settlementAuthentication = ICowAuthentication(_settlementContract.authenticator());
     }
@@ -151,5 +155,51 @@ contract FlashLoanRouter is IFlashLoanRouter {
                 result := mload(add(callData, 32))
             }
         }
+    }
+
+    /// @inheritdoc CowWrapper
+    /// @dev Wrapper data format:
+    ///      - First 32 bytes: length of ABI-encoded Loan.Data[]
+    ///      - Next len bytes: ABI-encoded Loan.Data[]
+    ///      - Remaining bytes: passed to _internalSettle (should contain next settlement address)
+    function _wrap(bytes calldata settleData, bytes calldata wrapperData) internal override {
+        (Loan.Data[] memory loans, bytes calldata remainingWrapperData) = _parseWrapperData(wrapperData);
+
+        // Construct the final settlement call that will be executed after all loans are processed
+        // This will call _internalSettle to continue the wrapper chain
+        bytes memory finalSettlement = abi.encodeCall(this.internalSettleExternal, (settleData, remainingWrapperData));
+
+        // Call flashLoanAndSettle which will handle the loan processing and eventually call our settlement
+        this.flashLoanAndSettle(loans, finalSettlement);
+    }
+
+    /// @notice External wrapper for _internalSettle to allow calling from flashLoanAndSettle
+    /// @dev This function can only be called by this contract itself
+    /// @param settleData The settlement data to pass to the next wrapper/settlement
+    /// @param remainingWrapperData The remaining wrapper data for the next wrapper/settlement
+    function internalSettleExternal(bytes calldata settleData, bytes calldata remainingWrapperData) external {
+        require(msg.sender == address(this), "Only callable by this contract");
+        pendingBorrower = SETTLING;
+        _internalSettle(settleData, remainingWrapperData);
+    }
+
+    /// @inheritdoc CowWrapper
+    function parseWrapperData(bytes calldata wrapperData) external pure override returns (bytes calldata) {
+        (, wrapperData) = _parseWrapperData(wrapperData);
+        return wrapperData;
+    }
+
+    /// @notice Internal function to parse wrapper data
+    /// @param wrapperData The wrapper data to parse
+    /// @return loans The parsed loan data
+    /// @return remainingWrapperData The remaining wrapper data after consuming our portion
+    function _parseWrapperData(bytes calldata wrapperData)
+        internal
+        pure
+        returns (Loan.Data[] memory loans, bytes calldata remainingWrapperData)
+    {
+        uint256 loansDataLength = uint256(bytes32(wrapperData[0:32]));
+        loans = abi.decode(wrapperData[32:32+loansDataLength], (Loan.Data[]));
+        remainingWrapperData = wrapperData[32+loansDataLength:];
     }
 }

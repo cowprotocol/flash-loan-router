@@ -3,8 +3,8 @@ pragma solidity ^0.8;
 
 import {Test} from "forge-std/Test.sol";
 
-import {AaveBorrower, IAavePool, IERC20, IFlashLoanRouter, ICowAuthentication} from "src/AaveBorrower.sol";
-import {GPv2Trade, GPv2Interaction} from "src/vendored/CowWrapper.sol";
+import {AaveBorrower, CowWrapper, IAavePool, IERC20, IFlashLoanRouter, ICowAuthentication} from "src/AaveBorrower.sol";
+import {CowSettlement} from "src/vendored/CowWrapper.sol";
 
 contract AaveBorrowerTest is Test {
     IFlashLoanRouter private router;
@@ -12,11 +12,14 @@ contract AaveBorrowerTest is Test {
     address private authenticator;
     address private solver;
 
+    IAavePool lender;
+
     function setUp() external {
         router = IFlashLoanRouter(makeAddr("AaveBorrowerTest: router"));
         address settlementContract = makeAddr("AaveBorrowerTest: settlementContract");
         authenticator = makeAddr("AaveBorrowerTest: authenticator");
         solver = makeAddr("AaveBorrowerTest: solver");
+        lender = IAavePool(makeAddr("AavePool"));
 
         vm.mockCall(
             address(router),
@@ -24,37 +27,12 @@ contract AaveBorrowerTest is Test {
             abi.encode(settlementContract)
         );
 
-        borrower = new AaveBorrower(router, ICowAuthentication(authenticator));
+        borrower = new AaveBorrower(lender, ICowAuthentication(authenticator));
     }
 
     function test_constructor_parameters() external view {
-        assertEq(address(borrower.router()), address(router));
-    }
-
-    function test_flashLoanAndCallBack_callsFlashLoan() external {
-        address lender = makeAddr("lender");
-        IERC20 token = IERC20(makeAddr("token"));
-        uint256 amount = 42;
-        bytes memory callBackData = hex"1337";
-
-        bytes memory lenderCallData = lenderCallDataWithDefaultParams(borrower, token, amount, callBackData);
-        vm.expectCall(lender, lenderCallData);
-        vm.mockCall(lender, lenderCallData, abi.encode(true));
-        vm.prank(address(router));
-        borrower.flashLoanAndCallBack(lender, token, amount, callBackData);
-    }
-
-    function test_flashLoanAndCallBack_revertsIfFlashLoanReverts() external {
-        address lender = makeAddr("lender");
-        IERC20 token = IERC20(makeAddr("token"));
-        uint256 amount = 42;
-        bytes memory callBackData = hex"1337";
-
-        bytes memory lenderCallData = lenderCallDataWithDefaultParams(borrower, token, amount, callBackData);
-        vm.mockCallRevert(lender, lenderCallData, "mock revert");
-        vm.prank(address(router));
-        vm.expectRevert("mock revert");
-        borrower.flashLoanAndCallBack(lender, token, amount, callBackData);
+        assertEq(address(borrower.LENDER()), address(lender));
+        assertEq(address(borrower.AUTHENTICATOR()), address(authenticator));
     }
 
     function test_onFlashLoan_callsInternalSettle() external {
@@ -106,13 +84,16 @@ contract AaveBorrowerTest is Test {
             abi.encode(false)
         );
 
-        // Build settle call with wrapper data appended
+        // Build settle call
         bytes memory settleCallData = abi.encodeCall(
-            borrower.settle, (
-            new IERC20[](0),          // tokens
-            new uint256[](0),          // clearingPrices
-            new GPv2Trade.Data[](0),              // trades (empty GPv2Trade.Data[])
-            [new GPv2Interaction.Data[](0), new GPv2Interaction.Data[](0), new GPv2Interaction.Data[](0)]  // interactions
+            borrower.wrappedSettle, (
+                abi.encodeCall(CowSettlement.settle, (
+                    new address[](0),          // tokens
+                    new uint256[](0),          // clearingPrices
+                    new CowSettlement.GPv2TradeData[](0),              // trades (empty GPv2Trade.Data[])
+                    [new CowSettlement.GPv2InteractionData[](0), new CowSettlement.GPv2InteractionData[](0), new CowSettlement.GPv2InteractionData[](0)]  // interactions
+                )),
+                new bytes(0)
         ));
 
         // Append minimal wrapper data (32 bytes for next settlement address)
@@ -132,19 +113,17 @@ contract AaveBorrowerTest is Test {
         );
 
         // Build settle call WITHOUT wrapper data appended
-        bytes memory settleCallData = abi.encodeCall(
-            borrower.settle, (
-            new IERC20[](0),
+        bytes memory settleData = abi.encodeCall(
+            CowSettlement.settle, (
+            new address[](0),
             new uint256[](0),
-            new GPv2Trade.Data[](0),
-            [new GPv2Interaction.Data[](0), new GPv2Interaction.Data[](0), new GPv2Interaction.Data[](0)]
+            new CowSettlement.GPv2TradeData[](0),
+            [new CowSettlement.GPv2InteractionData[](0), new CowSettlement.GPv2InteractionData[](0), new CowSettlement.GPv2InteractionData[](0)]
         ));
 
-        vm.prank(solver);
-        (bool success, bytes memory revertData) = address(borrower).call(settleCallData);
-        assertFalse(success, "Expected revert");
-        // Check that it reverted with WrapperHasNoSettleTarget
-        assertGt(revertData.length, 0, "Expected revert data");
+        vm.startPrank(solver);
+        vm.expectRevert(abi.encodeWithSelector(CowWrapper.WrapperHasNoSettleTarget.selector, 0, 20));
+        borrower.wrappedSettle(settleData, new bytes(0));
     }
 
     function test_settle_callsWrapAndTriggersFlashLoan() external {
@@ -156,7 +135,6 @@ contract AaveBorrowerTest is Test {
         );
 
         // Setup flashloan parameters
-        address lender = makeAddr("lender");
         address token = makeAddr("token");
         uint256 amount = 1000 ether;
         address nextSettlement = makeAddr("nextSettlement");
@@ -179,19 +157,21 @@ contract AaveBorrowerTest is Test {
             bytes32(uint256(uint160(nextSettlement)))  // next settlement address
         );
 
-        // Build settle call data with wrapper data appended
-        bytes memory settleCallData = abi.encodeCall(
-            borrower.settle, (
-            new IERC20[](0),
+        // Build settle data (the inner call to CowSettlement.settle)
+        bytes memory settleData = abi.encodeCall(
+            CowSettlement.settle, (
+            new address[](0),
             new uint256[](0),
-            new GPv2Trade.Data[](0),
-            [new GPv2Interaction.Data[](0), new GPv2Interaction.Data[](0), new GPv2Interaction.Data[](0)]
+            new CowSettlement.GPv2TradeData[](0),
+            [new CowSettlement.GPv2InteractionData[](0), new CowSettlement.GPv2InteractionData[](0), new CowSettlement.GPv2InteractionData[](0)]
         ));
-        settleCallData = abi.encodePacked(settleCallData, wrapperData);
+
+        // Build the outer wrappedSettle call with wrapper data
+        bytes memory settleCallData = abi.encodeCall(borrower.wrappedSettle, (settleData, wrapperData));
 
         // Mock the flashloan call
         vm.mockCall(
-            lender,
+            address(lender),
             abi.encodeWithSelector(IAavePool.flashLoan.selector),
             abi.encode(true)
         );
