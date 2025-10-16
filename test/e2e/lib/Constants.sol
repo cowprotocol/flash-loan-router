@@ -1,20 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import {ICowSettlement} from "src/interface/ICowSettlement.sol";
+import {CowSettlement} from "src/vendored/CowWrapper.sol";
 import {IERC20} from "src/vendored/IERC20.sol";
+import {ISignatureTransfer} from "src/vendored/ISignatureTransfer.sol";
 
 import {ICowAllowListAuthentication} from "./ICowAllowListAuthentication.sol";
+
+import {IAavePool} from "src/vendored/IAavePool.sol";
 
 library Constants {
     // Multi-chain
 
-    ICowSettlement internal constant SETTLEMENT_CONTRACT = ICowSettlement(0x9008D19f58AAbD9eD0D60971565AA8510560ab41);
+    CowSettlement internal constant SETTLEMENT_CONTRACT = CowSettlement(0x9008D19f58AAbD9eD0D60971565AA8510560ab41);
     ICowAllowListAuthentication internal constant SOLVER_AUTHENTICATOR =
         ICowAllowListAuthentication(0x2c4c28DDBdAc9C5E7055b4C863b72eA0149D8aFE);
     // The following address can add solvers on CoW Protocol in all networks and
     // forked blocks we consider in the e2e tests as of writing.
     address internal constant AUTHENTICATOR_MANAGER = 0xA03be496e67Ec29bC62F01a428683D7F9c204930;
+
+    IAavePool internal constant AAVE_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+
+    ISignatureTransfer internal constant PERMIT = ISignatureTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
     // Mainnet
     IERC20 internal constant DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);

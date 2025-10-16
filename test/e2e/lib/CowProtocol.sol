@@ -3,7 +3,7 @@ pragma solidity ^0.8;
 
 import {Vm} from "forge-std/Test.sol";
 
-import {ICowSettlement} from "src/interface/ICowSettlement.sol";
+import {CowSettlement} from "src/vendored/CowWrapper.sol";
 
 import {Constants} from "./Constants.sol";
 
@@ -13,18 +13,18 @@ library CowProtocol {
         Constants.SOLVER_AUTHENTICATOR.addSolver(solver);
     }
 
-    function emptySettleWithInteractions(ICowSettlement.Interaction[] memory intraInteractions) internal {
+    function emptySettleWithInteractions(CowSettlement.CowInteractionData[] memory intraInteractions) internal {
         (
             address[] memory noTokens,
             uint256[] memory noPrices,
-            ICowSettlement.Trade[] memory noTrades,
-            ICowSettlement.Interaction[][3] memory interactions
+            CowSettlement.CowTradeData[] memory noTrades,
+            CowSettlement.CowInteractionData[][3] memory interactions
         ) = emptySettleInputWithInteractions(intraInteractions);
 
         Constants.SETTLEMENT_CONTRACT.settle(noTokens, noPrices, noTrades, interactions);
     }
 
-    function encodeEmptySettleWithInteractions(ICowSettlement.Interaction[] memory intraInteractions)
+    function encodeEmptySettleWithInteractions(CowSettlement.CowInteractionData[] memory intraInteractions)
         internal
         pure
         returns (bytes memory)
@@ -32,27 +32,27 @@ library CowProtocol {
         (
             address[] memory noTokens,
             uint256[] memory noPrices,
-            ICowSettlement.Trade[] memory noTrades,
-            ICowSettlement.Interaction[][3] memory interactions
+            CowSettlement.CowTradeData[] memory noTrades,
+            CowSettlement.CowInteractionData[][3] memory interactions
         ) = emptySettleInputWithInteractions(intraInteractions);
 
-        return abi.encodeCall(ICowSettlement.settle, (noTokens, noPrices, noTrades, interactions));
+        return abi.encodeCall(CowSettlement.settle, (noTokens, noPrices, noTrades, interactions));
     }
 
-    function emptySettleInputWithInteractions(ICowSettlement.Interaction[] memory intraInteractions)
+    function emptySettleInputWithInteractions(CowSettlement.CowInteractionData[] memory intraInteractions)
         internal
         pure
         returns (
             address[] memory noTokens,
             uint256[] memory noPrices,
-            ICowSettlement.Trade[] memory noTrades,
-            ICowSettlement.Interaction[][3] memory interactions
+            CowSettlement.CowTradeData[] memory noTrades,
+            CowSettlement.CowInteractionData[][3] memory interactions
         )
     {
         noTokens = new address[](0);
         noPrices = new uint256[](0);
-        noTrades = new ICowSettlement.Trade[](0);
-        ICowSettlement.Interaction[] memory noInteractions = new ICowSettlement.Interaction[](0);
+        noTrades = new CowSettlement.CowTradeData[](0);
+        CowSettlement.CowInteractionData[] memory noInteractions = new CowSettlement.CowInteractionData[](0);
         interactions = [noInteractions, intraInteractions, noInteractions];
     }
 }

@@ -25,13 +25,6 @@ fs_permissions = [
 
 [fmt]
 sort_imports = true
-ignore = [
-  # Foundry's fmt doesn't support the `transient` keyword on variables.
-  # We ignore all files that have that keyword in them until Foundry fixes this
-  # issue on their end.
-  # https://github.com/foundry-rs/foundry/issues/9088
-  "src/FlashLoanRouter.sol",
-]
 
 [profile.ci]
 deny_warnings = true

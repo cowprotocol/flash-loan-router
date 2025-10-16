@@ -2,21 +2,21 @@
 pragma solidity >=0.7.6 <0.9.0;
 pragma abicoder v2;
 
-/// @title Gnosis Protocol v2 Authentication Interface
-/// @author Gnosis Developers
-interface GPv2Authentication {
+/// @title CoW Protocol Authentication Interface
+/// @author CoW DAO developers
+interface CowAuthentication {
     /// @dev determines whether the provided address is an authenticated solver.
     /// @param prospectiveSolver the address of prospective solver.
     /// @return true when prospectiveSolver is an authenticated solver, otherwise false.
     function isSolver(address prospectiveSolver) external view returns (bool);
 }
 
-/// @title CoW Settlement Interface
+/// @title CoW Protocol Settlement Interface
 /// @notice Minimal interface for CoW Protocol's settlement contract
 /// @dev Used for type-safe calls to the settlement contract's settle function
 interface CowSettlement {
     /// @notice Trade data structure matching GPv2Settlement
-    struct GPv2TradeData {
+    struct CowTradeData {
         uint256 sellTokenIndex;
         uint256 buyTokenIndex;
         address receiver;
@@ -31,7 +31,7 @@ interface CowSettlement {
     }
 
     /// @notice Interaction data structure for pre/intra/post-settlement hooks
-    struct GPv2InteractionData {
+    struct CowInteractionData {
         address target;
         uint256 value;
         bytes callData;
@@ -45,12 +45,14 @@ interface CowSettlement {
     function settle(
         address[] calldata tokens,
         uint256[] calldata clearingPrices,
-        GPv2TradeData[] calldata trades,
-        GPv2InteractionData[][3] calldata interactions
+        CowTradeData[] calldata trades,
+        CowInteractionData[][3] calldata interactions
     ) external;
+
+    function vaultRelayer() external returns (address);
 }
 
-/// @title CoW Wrapper Interface
+/// @title CoW Protocol Wrapper Interface
 /// @notice Interface for wrapper contracts that add custom logic around CoW settlements
 /// @dev Wrappers can be chained together to compose multiple settlement operations
 interface ICowWrapper {
@@ -72,13 +74,13 @@ interface ICowWrapper {
     function parseWrapperData(bytes calldata wrapperData) external view returns (bytes calldata remainingWrapperData);
 }
 
-/// @title CoW Wrapper Base Contract
+/// @title CoW Protocol Wrapper Base Contract
 /// @notice Abstract base contract for creating wrapper contracts around CoW Protocol settlements
 /// @dev A wrapper enables custom pre/post-settlement and context-setting logic and can be chained with other wrappers.
 ///      Wrappers must:
-///      - Be approved by the GPv2Authentication contract
+///      - Be approved by the CowAuthentication contract
 ///      - Verify the caller is an authenticated solver
-///      - Eventually call settle() on the approved GPv2Settlement contract
+///      - Eventually call settle() on the approved CowSettlement contract
 ///      - Implement _wrap() for custom logic
 ///      - Implement parseWrapperData() for validation of implementation-specific wrapperData
 abstract contract CowWrapper {
@@ -96,12 +98,12 @@ abstract contract CowWrapper {
     error InvalidSettleData(bytes invalidSettleData);
 
     /// @notice The authentication contract used to verify solvers
-    /// @dev This is typically the GPv2AllowListAuthentication contract
-    GPv2Authentication public immutable AUTHENTICATOR;
+    /// @dev This is typically the CowAllowListAuthentication contract
+    CowAuthentication public immutable AUTHENTICATOR;
 
     /// @notice Constructs a new CowWrapper
-    /// @param authenticator_ The GPv2Authentication contract to use for solver or upstream wrapper verification
-    constructor(GPv2Authentication authenticator_) {
+    /// @param authenticator_ The CowAuthentication contract to use for solver or upstream wrapper verification
+    constructor(CowAuthentication authenticator_) {
         AUTHENTICATOR = authenticator_;
     }
 
@@ -117,14 +119,10 @@ abstract contract CowWrapper {
         bytes calldata wrapperData
     ) external {
         // Revert if not a valid solver
-        if (!AUTHENTICATOR.isSolver(msg.sender)) {
-            revert NotASolver(msg.sender);
-        }
+        require(AUTHENTICATOR.isSolver(msg.sender), NotASolver(msg.sender));
 
         // Require wrapper data to contain at least the next settlement address (20 bytes)
-        if (wrapperData.length < 20) {
-            revert WrapperHasNoSettleTarget(wrapperData.length, 20);
-        }
+        require(wrapperData.length >= 20, WrapperHasNoSettleTarget(wrapperData.length, 20));
 
         // Delegate to the wrapper's custom logic
         _wrap(settleData, wrapperData);
@@ -152,13 +150,7 @@ abstract contract CowWrapper {
     /// @param wrapperData Remaining wrapper data starting with the next target address (20 bytes)
     function _internalSettle(bytes calldata settleData, bytes calldata wrapperData) internal {
         // Extract the next settlement address from the first 20 bytes of wrapperData
-        // Assembly is used to efficiently read the address from calldata
-        address nextSettlement;
-        assembly {
-            // Load 32 bytes starting 12 bytes before wrapperData offset to get the address
-            // (addresses are 20 bytes, right-padded in 32-byte words)
-            nextSettlement := calldataload(sub(wrapperData.offset, 12))
-        }
+        address nextSettlement = address(bytes20(wrapperData[:20]));
 
         // Skip past the address we just read
         wrapperData = wrapperData[20:];
@@ -166,9 +158,7 @@ abstract contract CowWrapper {
         if (wrapperData.length == 0) {
             // No more wrapper data - we're calling the final settlement contract
             // Verify the settle data has the correct function selector
-            if (bytes4(settleData[:4]) != CowSettlement.settle.selector) {
-                revert InvalidSettleData(settleData);
-            }
+            require(bytes4(settleData[:4]) == CowSettlement.settle.selector, InvalidSettleData(settleData));
 
             // Call the settlement contract directly with the settle data
             (bool success, bytes memory returnData) = nextSettlement.call(settleData);
