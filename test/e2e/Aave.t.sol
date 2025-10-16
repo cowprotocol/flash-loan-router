@@ -3,14 +3,14 @@ pragma solidity ^0.8;
 
 import {Test, Vm} from "forge-std/Test.sol";
 
-import {AaveBorrower, IAavePool} from "src/AaveBorrower.sol";
-import {FlashLoanRouter, Loan} from "src/FlashLoanRouter.sol";
-import {ICowSettlement} from "src/interface/IBorrower.sol";
+import {AaveCollateralSwapWrapper, IAavePool} from "src/AaveCollateralSwapWrapper.sol";
+import {CowSettlement} from "src/vendored/CowWrapper.sol";
+import {ISignatureTransfer} from "src/vendored/ISignatureTransfer.sol";
 
 import {Constants} from "./lib/Constants.sol";
 import {CowProtocol} from "./lib/CowProtocol.sol";
-import {CowProtocolInteraction} from "./lib/CowProtocolInteraction.sol";
 import {ForkedRpc} from "./lib/ForkedRpc.sol";
+import {PermitHash} from "./lib/PermitHash.sol";
 import {TokenBalanceAccumulator} from "./lib/TokenBalanceAccumulator.sol";
 
 library AaveSetup {
@@ -20,19 +20,8 @@ library AaveSetup {
     // https://app.aave.com/reserve-overview/?underlyingAsset=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&marketName=proto_mainnet_v3
     IAavePool internal constant WETH_POOL = IAavePool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
 
-    function prepareBorrower(Vm vm, FlashLoanRouter router, address solver) internal returns (AaveBorrower borrower) {
-        borrower = new AaveBorrower(router);
-
-        // Call `approve` from the settlement contract so that WETH can be spent
-        // on a settlement interaction on behalf of the borrower. With an
-        // unlimited approval, this step only needs to be performed once per
-        // loaned token.
-        ICowSettlement.Interaction[] memory onlyApprove = new ICowSettlement.Interaction[](1);
-        onlyApprove[0] = CowProtocolInteraction.borrowerApprove(
-            borrower, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), type(uint256).max
-        );
-        vm.prank(solver);
-        CowProtocol.emptySettleWithInteractions(onlyApprove);
+    function prepareBorrower() internal returns (AaveCollateralSwapWrapper borrower) {
+        borrower = new AaveCollateralSwapWrapper(WETH_POOL, Constants.SOLVER_AUTHENTICATOR);
     }
 }
 
@@ -49,95 +38,184 @@ contract E2eAave is Test {
     uint256 private constant MAINNET_FORK_BLOCK = 21883877;
     address private solver = makeAddr("E2eAaveV2: solver");
 
-    AaveBorrower private borrower;
+    AaveCollateralSwapWrapper private borrower;
     TokenBalanceAccumulator private tokenBalanceAccumulator;
-    FlashLoanRouter private router;
 
     function setUp() external {
         vm.forkEthereumMainnetAtBlock(MAINNET_FORK_BLOCK);
         tokenBalanceAccumulator = new TokenBalanceAccumulator();
-        router = new FlashLoanRouter(Constants.SETTLEMENT_CONTRACT);
+        borrower = AaveSetup.prepareBorrower();
         CowProtocol.addSolver(vm, solver);
-        CowProtocol.addSolver(vm, address(router));
-        borrower = AaveSetup.prepareBorrower(vm, router, solver);
+        CowProtocol.addSolver(vm, address(borrower));
     }
 
     function test_settleWithFlashLoan() external {
+        // Create a user who will swap DAI for WETH collateral
+        uint256 userPrivateKey = 0xBEEF;
+        address user = vm.addr(userPrivateKey);
+
+        uint256 amountIn = 1000 ether; // 1000 DAI to swap
         uint256 loanedAmount = 500 ether; // 500 WETH
 
-        // Note: one unit of flash fee represents 0.1% of the borrowed amount.
-        // See:
-        // <https://github.com/aave-dao/aave-v3-origin/blob/v3.1.0/src/core/contracts/protocol/libraries/math/PercentageMath.sol>
+        // Fund the user with DAI and approve Permit2
+        deal(address(Constants.DAI), user, amountIn);
+        vm.prank(user);
+        Constants.DAI.approve(address(Constants.PERMIT), type(uint256).max);
+
         uint256 relativeFlashFee = AaveSetup.WETH_POOL.FLASHLOAN_PREMIUM_TOTAL();
         assertGt(relativeFlashFee, 0);
         uint256 absoluteFlashFee = loanedAmount * relativeFlashFee / 1000;
 
         uint256 settlementInitialWethBalance = Constants.WETH.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
-        // We cover the balance of the flash fee with the tokens that are
-        // currently present in the settlement contract.
         assertGt(settlementInitialWethBalance, absoluteFlashFee);
 
-        TokenBalanceAccumulator.Balance[] memory expectedBalances = new TokenBalanceAccumulator.Balance[](3);
+        // Create CollateralSwapOperation
+        AaveCollateralSwapWrapper.CollateralSwapOperation memory op = AaveCollateralSwapWrapper.CollateralSwapOperation({
+            owner: user,
+            deadline: block.timestamp + 1000,
+            nonce: 0,
+            swapFrom: address(Constants.DAI),
+            swapTo: address(Constants.WETH),
+            amountIn: amountIn,
+            minAmountOut: loanedAmount
+        });
 
-        // Start preparing the settlement interactions.
-        ICowSettlement.Interaction[] memory interactionsWithFlashLoan = new ICowSettlement.Interaction[](6);
-        // First, we confirm that, at the point in time of the settlement, the
-        // flash loan proceeds are indeed stored in the borrower.
-        interactionsWithFlashLoan[0] =
-            CowProtocolInteraction.pushBalanceToAccumulator(tokenBalanceAccumulator, Constants.WETH, address(borrower));
-        expectedBalances[0] = TokenBalanceAccumulator.Balance(Constants.WETH, address(borrower), loanedAmount);
-        // Second, we double check that the settlement balance hasn't changed.
-        interactionsWithFlashLoan[1] = CowProtocolInteraction.pushBalanceToAccumulator(
-            tokenBalanceAccumulator, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT)
+        // Encode CollateralSwapOperation for wrapperData
+        bytes memory encoded = abi.encode(op);
+
+        // Hash the witness struct according to EIP-712
+        // The witness hash must be: keccak256(abi.encode(TYPEHASH, ...fields...))
+        bytes32 witnessHash = keccak256(
+            abi.encode(
+                keccak256(bytes(borrower.COLLATERAL_SWAP_WITNESS_TYPE())),
+                op.owner,
+                op.deadline,
+                op.nonce,
+                op.swapFrom,
+                op.swapTo,
+                op.amountIn,
+                op.minAmountOut
+            )
         );
-        expectedBalances[1] = TokenBalanceAccumulator.Balance(
-            Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), settlementInitialWethBalance
+
+        // Build the full witness type string for Permit2
+        // Format: "WitnessType witness)WitnessType(...)TokenPermissions(...)"
+        string memory witnessTypeString = string(abi.encodePacked(
+            "CollateralSwapOperation witness)",
+            borrower.COLLATERAL_SWAP_WITNESS_TYPE(),
+            "TokenPermissions(address token,uint256 amount)"
+        ));
+
+        // Generate Permit2 signature
+        bytes memory signature = _signPermitWitness(
+            userPrivateKey,
+            address(borrower), // spender
+            address(Constants.DAI),
+            amountIn,
+            0, // nonce
+            block.timestamp + 1000, // deadline
+            witnessHash,
+            witnessTypeString
         );
-        // Third, we make sure we can transfer these tokens. We do that by
-        // trying a transfer into the settlement contract. The expectation is
-        // that the borrower has already approved the settlement contract to
-        // transfer its tokens out of it. In practice, the target of the
-        // transfer is expected to be the user rather than the settlement
-        // contract for gas efficiency.
-        interactionsWithFlashLoan[2] = CowProtocolInteraction.transferFrom(
-            Constants.WETH, address(borrower), address(Constants.SETTLEMENT_CONTRACT), loanedAmount
+
+        bytes memory wrapperData = abi.encodePacked(
+            encoded,
+            abi.encode(signature),
+            Constants.SETTLEMENT_CONTRACT
         );
-        // Fourth, we check that the balance has indeed changed.
-        interactionsWithFlashLoan[3] = CowProtocolInteraction.pushBalanceToAccumulator(
-            tokenBalanceAccumulator, Constants.WETH, address(Constants.SETTLEMENT_CONTRACT)
-        );
+
+        TokenBalanceAccumulator.Balance[] memory expectedBalances = new TokenBalanceAccumulator.Balance[](3);
         expectedBalances[2] = TokenBalanceAccumulator.Balance(
             Constants.WETH, address(Constants.SETTLEMENT_CONTRACT), settlementInitialWethBalance + loanedAmount
         );
-        // Fifth, prepare the flash-loan repayment. Aave makes you repay the
-        // loan by calling `transferFrom` under the assumption that the flash
-        // loan borrower holds the funds plus the expected fee and has approved
-        // its contract for withdrawing this amount.
-        interactionsWithFlashLoan[4] = CowProtocolInteraction.borrowerApprove(
-            borrower, Constants.WETH, address(AaveSetup.WETH_POOL), loanedAmount + absoluteFlashFee
-        );
-        // Sixth and finally, send the funds to the borrower for repayment of
-        // the loan.
-        interactionsWithFlashLoan[5] =
-            CowProtocolInteraction.transfer(Constants.WETH, address(borrower), loanedAmount + absoluteFlashFee);
 
-        bytes memory settleCallData = CowProtocol.encodeEmptySettleWithInteractions(interactionsWithFlashLoan);
-
-        Loan.Data[] memory loans = new Loan.Data[](1);
-        loans[0] = Loan.Data({
-            amount: loanedAmount,
-            borrower: borrower,
-            lender: address(AaveSetup.WETH_POOL),
-            token: Constants.WETH
-        });
+        // add the token the settlement contract would need to return to the buffer
+        deal(address(Constants.WETH), address(Constants.SETTLEMENT_CONTRACT), op.minAmountOut + absoluteFlashFee);
 
         vm.prank(solver);
-        router.flashLoanAndSettle(loans, settleCallData);
-
-        tokenBalanceAccumulator.assertAccumulatorEq(vm, expectedBalances);
-        assertEq(
-            Constants.WETH.balanceOf(address(Constants.SETTLEMENT_CONTRACT)),
-            settlementInitialWethBalance - absoluteFlashFee
+        borrower.wrappedSettle(
+            _encodeSettleWithSingleOrder(op.swapFrom, op.swapTo, op.amountIn, op.minAmountOut + absoluteFlashFee, address(borrower)),
+            wrapperData
         );
+    }
+
+    // Helper function to generate Permit2 witness signature
+    function _signPermitWitness(
+        uint256 privateKey,
+        address spender,
+        address token,
+        uint256 amount,
+        uint256 nonce,
+        uint256 deadline,
+        bytes32 witness,
+        string memory witnessTypeString
+    ) internal view returns (bytes memory) {
+        bytes32 msgHash;
+        {
+            ISignatureTransfer.PermitTransferFrom memory permit = ISignatureTransfer.PermitTransferFrom({
+                permitted: ISignatureTransfer.TokenPermissions({
+                    token: token,
+                    amount: amount
+                }),
+                nonce: nonce,
+                deadline: deadline
+            });
+
+            // Use PermitHash library to generate the correct hash
+            bytes32 permitHash = PermitHash.hashWithWitness(permit, spender, witness, witnessTypeString);
+
+            msgHash = keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    Constants.PERMIT.DOMAIN_SEPARATOR(),
+                    permitHash
+                )
+            );
+        }
+
+        // Sign the message
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, msgHash);
+        return abi.encodePacked(r, s, v);
+    }
+
+    // Helper function to generate a settle with a single order
+    function _encodeSettleWithSingleOrder(
+        address sellToken,
+        address buyToken,
+        uint256 sellAmount,
+        uint256 buyAmount,
+        address receiver
+    ) internal view returns (bytes memory) {
+        // Create token array with sell and buy tokens
+        address[] memory tokens = new address[](2);
+        tokens[0] = sellToken;
+        tokens[1] = buyToken;
+
+        // Create clearing prices (not critical for this test, can be 1:1)
+        uint256[] memory clearingPrices = new uint256[](2);
+        clearingPrices[0] = buyAmount;
+        clearingPrices[1] = sellAmount;
+
+        // Create a single trade
+        CowSettlement.CowTradeData[] memory trades = new CowSettlement.CowTradeData[](1);
+        trades[0] = CowSettlement.CowTradeData({
+            sellTokenIndex: 0, // Index of sellToken in tokens array
+            buyTokenIndex: 1,  // Index of buyToken in tokens array
+            receiver: receiver,
+            sellAmount: sellAmount,
+            buyAmount: buyAmount,
+            validTo: 0xffffffff, // Max validity
+            appData: bytes32(0),
+            feeAmount: 0,
+            flags: 1 << 6, // set the flag for EIP-1271
+            executedAmount: sellAmount,
+            signature: abi.encodePacked(address(borrower))
+        });
+
+        // No interactions
+        CowSettlement.CowInteractionData[] memory noInteractions = new CowSettlement.CowInteractionData[](0);
+        CowSettlement.CowInteractionData[][3] memory interactions = [noInteractions, noInteractions, noInteractions];
+
+        return abi.encodeCall(CowSettlement.settle, (tokens, clearingPrices, trades, interactions));
     }
 }
