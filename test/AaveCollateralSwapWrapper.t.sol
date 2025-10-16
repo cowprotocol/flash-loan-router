@@ -1,0 +1,197 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+pragma solidity ^0.8;
+
+import {Test} from "forge-std/Test.sol";
+
+import {AaveCollateralSwapWrapper, CowWrapper, IAavePool, IERC20, ICowAuthentication} from "src/AaveCollateralSwapWrapper.sol";
+import {CowSettlement} from "src/vendored/CowWrapper.sol";
+
+contract AaveBorrowerTest is Test {
+    AaveCollateralSwapWrapper private borrower;
+    address private authenticator;
+    address private solver;
+
+    IAavePool lender;
+
+    function setUp() external {
+        authenticator = makeAddr("AaveBorrowerTest: authenticator");
+        solver = makeAddr("AaveBorrowerTest: solver");
+        lender = IAavePool(makeAddr("AavePool"));
+
+        borrower = new AaveCollateralSwapWrapper(lender, ICowAuthentication(authenticator));
+    }
+
+    function test_constructor_parameters() external view {
+        assertEq(address(borrower.LENDER()), address(lender));
+        assertEq(address(borrower.AUTHENTICATOR()), address(authenticator));
+    }
+
+    function test_onFlashLoan_callsInternalSettle() external {
+        bytes memory settleData = hex"1337";
+        address nextSettlement = makeAddr("nextSettlement");
+        // wrapperData needs the settlement address as a 32-byte word (left-padded)
+        bytes memory wrapperData = abi.encodePacked(bytes32(uint256(uint160(nextSettlement))));
+        bytes memory callBackData = abi.encode(settleData, wrapperData);
+
+        // Mock the settle call to the next settlement contract
+        vm.mockCall(nextSettlement, new bytes(0), abi.encode(true));
+
+        borrower.executeOperation(new address[](0), new uint256[](0), new uint256[](0), address(0), callBackData);
+    }
+
+    function test_onFlashLoan_returnsTrue() external {
+        bytes memory settleData = hex"1337";
+        address nextSettlement = makeAddr("nextSettlement");
+        // wrapperData needs the settlement address as a 32-byte word (left-padded)
+        bytes memory wrapperData = abi.encodePacked(bytes32(uint256(uint160(nextSettlement))));
+        bytes memory callBackData = abi.encode(settleData, wrapperData);
+
+        // Mock the settle call to the next settlement contract
+        vm.mockCall(nextSettlement, new bytes(0), abi.encode(true));
+
+        bool output =
+            borrower.executeOperation(new address[](0), new uint256[](0), new uint256[](0), address(0), callBackData);
+        assertTrue(output);
+    }
+
+    function test_onFlashLoan_revertsIfInternalSettleReverts() external {
+        bytes memory settleData = hex"1337";
+        address nextSettlement = makeAddr("nextSettlement");
+        // wrapperData needs the settlement address as a 32-byte word (left-padded)
+        bytes memory wrapperData = abi.encodePacked(bytes32(uint256(uint160(nextSettlement))));
+        bytes memory callBackData = abi.encode(settleData, wrapperData);
+
+        // Mock a revert when the settlement is called
+        vm.mockCallRevert(nextSettlement, new bytes(0), "mock revert");
+        vm.expectRevert("mock revert");
+        borrower.executeOperation(new address[](0), new uint256[](0), new uint256[](0), address(0), callBackData);
+    }
+
+    function test_settle_revertsIfNotSolver() external {
+        // Mock the authenticator to return false for the caller
+        vm.mockCall(
+            authenticator,
+            abi.encodeWithSignature("isSolver(address)", address(this)),
+            abi.encode(false)
+        );
+
+        // Build settle call
+        bytes memory settleCallData = abi.encodeCall(
+            borrower.wrappedSettle, (
+                abi.encodeCall(CowSettlement.settle, (
+                    new address[](0),          // tokens
+                    new uint256[](0),          // clearingPrices
+                    new CowSettlement.CowTradeData[](0),              // trades (empty GPv2Trade.Data[])
+                    [new CowSettlement.CowInteractionData[](0), new CowSettlement.CowInteractionData[](0), new CowSettlement.CowInteractionData[](0)]  // interactions
+                )),
+                new bytes(0)
+        ));
+
+        // Append minimal wrapper data (32 bytes for next settlement address)
+        settleCallData = abi.encodePacked(settleCallData, bytes32(uint256(uint160(makeAddr("nextSettlement")))));
+
+        (bool success, bytes memory revertData) = address(borrower).call(settleCallData);
+        assertFalse(success, "Expected revert");
+        assertEq(revertData, abi.encodeWithSignature("NotASolver(address)", address(this)));
+    }
+
+    function test_settle_revertsIfNoWrapperData() external {
+        // Mock the authenticator to return true for the solver
+        vm.mockCall(
+            authenticator,
+            abi.encodeWithSignature("isSolver(address)", solver),
+            abi.encode(true)
+        );
+
+        // Build settle call WITHOUT wrapper data appended
+        bytes memory settleData = abi.encodeCall(
+            CowSettlement.settle, (
+            new address[](0),
+            new uint256[](0),
+            new CowSettlement.CowTradeData[](0),
+            [new CowSettlement.CowInteractionData[](0), new CowSettlement.CowInteractionData[](0), new CowSettlement.CowInteractionData[](0)]
+        ));
+
+        vm.startPrank(solver);
+        vm.expectRevert(abi.encodeWithSelector(CowWrapper.WrapperHasNoSettleTarget.selector, 0, 20));
+        borrower.wrappedSettle(settleData, new bytes(0));
+    }
+
+    function test_settle_callsWrapAndTriggersFlashLoan() external {
+        // Mock the authenticator to return true for the solver
+        vm.mockCall(
+            authenticator,
+            abi.encodeWithSignature("isSolver(address)", solver),
+            abi.encode(true)
+        );
+
+        // Setup flashloan parameters
+        address token = makeAddr("token");
+        uint256 amount = 1000 ether;
+        address nextSettlement = makeAddr("nextSettlement");
+
+        // Build wrapperData:
+        // 1. First 32 bytes: length of the ABI-encoded flashloan params
+        // 2. Next len bytes: ABI-encoded (address lender, address[] assets, uint256[] amounts)
+        // 3. Next 32 bytes: nextSettlement address
+        address[] memory assets = new address[](1);
+        assets[0] = token;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+
+        bytes memory flashloanParams = abi.encode(lender, assets, amounts);
+        uint256 flashloanParamsLen = flashloanParams.length;
+
+        bytes memory wrapperData = abi.encodePacked(
+            bytes32(flashloanParamsLen),  // length prefix
+            flashloanParams,               // encoded flashloan params
+            bytes32(uint256(uint160(nextSettlement)))  // next settlement address
+        );
+
+        // Build settle data (the inner call to CowSettlement.settle)
+        bytes memory settleData = abi.encodeCall(
+            CowSettlement.settle, (
+            new address[](0),
+            new uint256[](0),
+            new CowSettlement.CowTradeData[](0),
+            [new CowSettlement.CowInteractionData[](0), new CowSettlement.CowInteractionData[](0), new CowSettlement.CowInteractionData[](0)]
+        ));
+
+        // Build the outer wrappedSettle call with wrapper data
+        bytes memory settleCallData = abi.encodeCall(borrower.wrappedSettle, (settleData, wrapperData));
+
+        // Mock the flashloan call
+        vm.mockCall(
+            address(lender),
+            abi.encodeWithSelector(IAavePool.flashLoan.selector),
+            abi.encode(true)
+        );
+
+        // Call settle
+        vm.prank(solver);
+        (bool success,) = address(borrower).call{gas: 10000000}(settleCallData);
+        assertTrue(success, "Settle call failed");
+    }
+
+    function lenderCallDataWithDefaultParams(
+        AaveCollateralSwapWrapper _borrower,
+        IERC20 token,
+        uint256 amount,
+        bytes memory callBackData
+    ) private pure returns (bytes memory) {
+        address receiverAddress = address(_borrower);
+        address[] memory assets = new address[](1);
+        assets[0] = address(token);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+        uint256[] memory interestRateModes = new uint256[](1);
+        interestRateModes[0] = 0;
+        address onBehalfOf = address(_borrower);
+        bytes memory params = callBackData;
+        uint16 referralCode = 0;
+
+        return abi.encodeCall(
+            IAavePool.flashLoan, (receiverAddress, assets, amounts, interestRateModes, onBehalfOf, params, referralCode)
+        );
+    }
+}
