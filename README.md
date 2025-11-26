@@ -147,7 +147,13 @@ $ forge fmt
 
 ### Deploy
 
-The deployment [scripts](script) permit the deployment of a single contract or all contracts at once.
+For deploying on a new network, there are two steps:
+
+1. [Deploy all contracts.](#deploy-all-contracts)
+2. [Update the `networks.json` file.](#deployment-addresses)
+
+For deploying new contracts on an existing network, the deployment [scripts](script) permit the deployment of a single contract or all contracts at once.
+The networks.json file needs to be updated as linked above.
 
 #### Environment setup
 
