@@ -147,7 +147,13 @@ $ forge fmt
 
 ### Deploy
 
-The deployment [scripts](script) permit the deployment of a single contract or all contracts at once.
+For deploying on a new network, there are two steps:
+
+1. [Deploy all contracts.](#deploy-all-contracts)
+2. [Update the `networks.json` file.](#deployment-addresses)
+
+For deploying new contracts on an existing network, the deployment [scripts](script) permit the deployment of a single contract or all contracts at once.
+The networks.json file needs to be updated as linked above.
 
 #### Environment setup
 
@@ -203,8 +209,12 @@ forge script script/single-deployment/DeployFlashLoanRouter.s.sol:DeployFlashLoa
 
 The file [`networks.json`](./networks.json) lists all official deployments of the contracts in this repository by chain id.
 
-The deployment addresses file is generated with:
+This file is generated automatically using the broadcast files in the `broadcast/` directory.
 
-```shell
-bash dev/generate-networks-file.sh > networks.json
+Most of the deployments are done using the `forge` script as described in this README, however, some networks might be deployed in some other way (like replaying the creation code and constructor arguments). For these, we will need to manually update the file `broadcast/networks-manual.json`.
+
+To regenerate the file after a new deployment, run the following command:
+
+```sh
+bash script/generate-networks-file.sh > networks.json
 ```

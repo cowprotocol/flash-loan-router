@@ -1,0 +1,20 @@
+{
+  "AaveBorrower": {
+    "232": {
+      "address": "0x7d9c4dee56933151bc5c909cfe09def0d315cb4a",
+      "transactionHash": "0xc848728231cbdb4ec3357b15f72110fe917b0df13757ae9159bfd36c5a13b355"
+    }
+  },
+  "ERC3156Borrower": {
+    "232": {
+      "address": "0x47d71b4b3336ab2729436186c216955f3c27cd04",
+      "transactionHash": "0xfb19da501e4a3c874d1cf1458a277cf56846347181a7e25974260f21015ff497"
+    }
+  },
+  "FlashLoanRouter": {
+    "232": {
+      "address": "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
+      "transactionHash": "0xe162007fa0e73c290e08b811f5b9144634a72551973ff299bd7b1c3e7d09d63b"
+    }
+  }
+}
