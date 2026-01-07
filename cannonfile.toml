@@ -1,0 +1,28 @@
+#:schema https://raw.githubusercontent.com/usecannon/cannon/refs/heads/dev/packages/lsp/src/schema.json
+name = "cow-flash-loan-router"
+version = "1.0.0"
+
+[import.cow]
+source = "cow-settlement:2.0.1"
+
+[var.main]
+salt = "0x000000000000000000000000000000000000000000000000000000000000005d"
+cowSettlement = "<%= cow.Settlement.address %>"
+
+[deploy.FlashLoanRouter]
+artifact = "FlashLoanRouter"
+create2 = true
+salt = "<%= settings.salt %>"
+args = ["<%= settings.cowSettlement %>"]
+
+[deploy.BorrowerAave]
+artifact = "AaveBorrower"
+create2 = true
+salt = "<%= settings.salt %>"
+args = ["<%= contracts.FlashLoanRouter.address %>"]
+
+[deploy.ERC3156Borrower]
+artifact = "ERC3156Borrower"
+create2 = true
+salt = "<%= settings.salt %>"
+args = ["<%= contracts.FlashLoanRouter.address %>"]
