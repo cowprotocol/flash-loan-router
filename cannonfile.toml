@@ -3,7 +3,7 @@ name = "cow-flash-loan-router"
 version = "1.0.0"
 
 [import.cow]
-source = "cow-settlement:2.0.1"
+source = "cow-settlement:2.0.2"
 
 [var.main]
 salt = "0x000000000000000000000000000000000000000000000000000000000000005d"
