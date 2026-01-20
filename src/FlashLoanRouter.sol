@@ -138,11 +138,7 @@ contract FlashLoanRouter is IFlashLoanRouter {
             // NOTE: Read the first 32 bytes in the array. The value does not
             // need to be shifted since `bytesN` values are left aligned, and
             // the value does not need to be masked since masking occurs when
-            // the value is accessed and not stored. The first word of the
-            // memory data is the call data length, the content starts in the
-            // next word.
-            // <https://docs.soliditylang.org/en/v0.8.28/internals/layout_in_memory.html>
-            // <https://docs.soliditylang.org/en/v0.8.28/assembly.html#access-to-external-variables-functions-and-libraries>
+            // the value is accessed and not stored.
             // solhint-disable-next-line no-inline-assembly
             // Addition overflow can only happen if the input bytes point to a
             // memory address close to (`type(uint256).max`), which would not be
