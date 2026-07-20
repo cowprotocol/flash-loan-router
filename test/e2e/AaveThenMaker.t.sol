@@ -41,16 +41,23 @@ contract E2eAaveThenMaker is Test {
     }
 
     function test_settleWithFlashLoans() external {
-        uint256 aaveLoanedAmount = 500 ether; // 500 WETH
+        uint256 desiredAaveLoanedAmount = 500 ether; // 500 WETH
         uint256 makerLoanedAmount = 10_000 ether; // $10,000
 
         uint256 makerAmountWithFee = makerLoanedAmount; // no fee
         // We cover the balance of the flash fee with the tokens that are
         // currently present in the settlement contract.
         uint256 relativeFlashFee = AaveSetup.WETH_POOL.FLASHLOAN_PREMIUM_TOTAL();
-        uint256 aaveAmountWithFee = aaveLoanedAmount + aaveLoanedAmount * relativeFlashFee / 1000;
 
         uint256 settlementInitialWethBalance = Constants.WETH.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
+        uint256 maxAaveLoanFromBuffers = settlementInitialWethBalance * 1000 / relativeFlashFee;
+        uint256 aaveLoanedAmount = desiredAaveLoanedAmount > maxAaveLoanFromBuffers
+            ? maxAaveLoanFromBuffers
+            : desiredAaveLoanedAmount;
+        require(aaveLoanedAmount > 0, "E2eAaveThenMaker: insufficient WETH buffers");
+
+        uint256 aaveAmountWithFee = aaveLoanedAmount + aaveLoanedAmount * relativeFlashFee / 1000;
+
         uint256 settlementInitialDaiBalance = Constants.DAI.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
 
         Loan.Data[] memory loans = new Loan.Data[](2);
