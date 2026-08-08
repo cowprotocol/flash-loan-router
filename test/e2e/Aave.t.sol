@@ -63,19 +63,21 @@ contract E2eAave is Test {
     }
 
     function test_settleWithFlashLoan() external {
-        uint256 loanedAmount = 500 ether; // 500 WETH
+        uint256 desiredLoanAmount = 500 ether; // 500 WETH
 
         // Note: one unit of flash fee represents 0.1% of the borrowed amount.
         // See:
         // <https://github.com/aave-dao/aave-v3-origin/blob/v3.1.0/src/core/contracts/protocol/libraries/math/PercentageMath.sol>
         uint256 relativeFlashFee = AaveSetup.WETH_POOL.FLASHLOAN_PREMIUM_TOTAL();
         assertGt(relativeFlashFee, 0);
-        uint256 absoluteFlashFee = loanedAmount * relativeFlashFee / 1000;
 
         uint256 settlementInitialWethBalance = Constants.WETH.balanceOf(address(Constants.SETTLEMENT_CONTRACT));
-        // We cover the balance of the flash fee with the tokens that are
-        // currently present in the settlement contract.
-        assertGt(settlementInitialWethBalance, absoluteFlashFee);
+
+        uint256 maxLoanFromBuffers = settlementInitialWethBalance * 1000 / relativeFlashFee;
+        uint256 loanedAmount = desiredLoanAmount > maxLoanFromBuffers ? maxLoanFromBuffers : desiredLoanAmount;
+        require(loanedAmount > 0, "E2eAave: insufficient WETH buffers");
+
+        uint256 absoluteFlashFee = loanedAmount * relativeFlashFee / 1000;
 
         TokenBalanceAccumulator.Balance[] memory expectedBalances = new TokenBalanceAccumulator.Balance[](3);
 
